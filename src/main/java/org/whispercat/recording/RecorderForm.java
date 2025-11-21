@@ -123,18 +123,18 @@ public class RecorderForm extends javax.swing.JPanel {
         // Add components to center panel with proper spacing
         centerPanel.add(Box.createVerticalStrut(10));
         centerPanel.add(statusIndicatorPanel);  // Status indicator + record button
-        centerPanel.add(Box.createVerticalStrut(20));  // Section spacing
+        centerPanel.add(Box.createVerticalStrut(15));  // Reduced spacing
         centerPanel.add(transcriptionPanel);
-        centerPanel.add(Box.createVerticalStrut(10));
+        centerPanel.add(Box.createVerticalStrut(8));
         centerPanel.add(copyButton);
-        centerPanel.add(Box.createVerticalStrut(15));
+        centerPanel.add(Box.createVerticalStrut(10));
 
         // Drag & drop hint
         JLabel dragDropLabel = new JLabel("Drag & drop an audio file here.");
         dragDropLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         dragDropLabel.setForeground(Color.GRAY);
         centerPanel.add(dragDropLabel);
-        centerPanel.add(Box.createVerticalStrut(20));  // Section spacing
+        centerPanel.add(Box.createVerticalStrut(10));  // Reduced spacing
         centerPanel.add(Box.createVerticalGlue());
 
         centerPanel.setTransferHandler(new TransferHandler() {
@@ -291,7 +291,7 @@ public class RecorderForm extends javax.swing.JPanel {
         // Console log panel
         JPanel consolePanel = new JPanel(new BorderLayout());
         consolePanel.setBorder(BorderFactory.createTitledBorder("Execution Log"));
-        consoleLogArea = new JTextArea(8, 20);
+        consoleLogArea = new JTextArea(15, 20);  // Increased from 8 to 15 rows
         consoleLogArea.setEditable(false);
         consoleLogArea.setLineWrap(true);
         consoleLogArea.setWrapStyleWord(true);
@@ -319,10 +319,10 @@ public class RecorderForm extends javax.swing.JPanel {
                 layout.createSequentialGroup()
                         .addContainerGap()
                         .addComponent(centerPanel)
-                        .addGap(20)  // Spacing between sections
+                        .addGap(12)  // Reduced spacing between sections
                         .addComponent(postProcessingContainerPanel)
-                        .addGap(20)  // Spacing between sections
-                        .addComponent(consolePanel, 150, 150, 150)
+                        .addGap(12)  // Reduced spacing between sections
+                        .addComponent(consolePanel, 250, 250, 250)  // Increased from 150 to 250
                         .addContainerGap(20, Short.MAX_VALUE)
         );
 
