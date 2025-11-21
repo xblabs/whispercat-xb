@@ -118,7 +118,21 @@ public class GlobalHotkeyListener implements NativeKeyListener {
             if (!combinationActive) {
                 combinationActive = true;
                 logger.info("Key combination pressed, toggling recording");
-                ui.recorderForm.toggleRecording();
+                // Switch to recorder form if not already there
+                ui.setSelectedMenu(0, 0);
+                // Small delay to ensure UI has switched before toggling
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException ex) {
+                    logger.debug("Sleep interrupted", ex);
+                }
+                if (ui.recorderForm != null) {
+                    ui.recorderForm.toggleRecording();
+                } else {
+                    logger.warn("RecorderForm is null, cannot toggle recording");
+                    Notificationmanager.getInstance().showNotification(ToastNotification.Type.WARNING,
+                            "Recording could not be started. Please try again.");
+                }
                 pressedKeys.clear();
                 sequenceIndex = 0;
                 sequenceStartTime = 0;
@@ -142,7 +156,21 @@ public class GlobalHotkeyListener implements NativeKeyListener {
                     if (sequenceIndex == hotKeySequence.length) {
                         if (currentTime - sequenceStartTime <= 1000) {
                             logger.info("Key sequence completed, toggling recording");
-                            ui.recorderForm.toggleRecording();
+                            // Switch to recorder form if not already there
+                            ui.setSelectedMenu(0, 0);
+                            // Small delay to ensure UI has switched before toggling
+                            try {
+                                Thread.sleep(50);
+                            } catch (InterruptedException ex) {
+                                logger.debug("Sleep interrupted", ex);
+                            }
+                            if (ui.recorderForm != null) {
+                                ui.recorderForm.toggleRecording();
+                            } else {
+                                logger.warn("RecorderForm is null, cannot toggle recording");
+                                Notificationmanager.getInstance().showNotification(ToastNotification.Type.WARNING,
+                                        "Recording could not be started. Please try again.");
+                            }
                         } else {
                             logger.debug("Key sequence completed, but time limit was reached. Current time limit: 1000ms");
                         }

@@ -58,6 +58,13 @@ public class PostProcessingListForm extends JPanel {
         List<PostProcessingData> postProcessingList = configManager.getPostProcessingDataList();
         logger.info("Post Processing List: {}", postProcessingList);
 
+        // Sort the list alphabetically by title (case-insensitive)
+        postProcessingList.sort((a, b) -> {
+            String titleA = (a.title != null && !a.title.trim().isEmpty()) ? a.title : "No Title";
+            String titleB = (b.title != null && !b.title.trim().isEmpty()) ? b.title : "No Title";
+            return titleA.compareToIgnoreCase(titleB);
+        });
+
         // For each item, create a panel showing its title, description, and buttons.
         for (PostProcessingData data : postProcessingList) {
             // Deserialize to get the title and description.

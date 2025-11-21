@@ -257,6 +257,22 @@ public class PostProcessingForm extends JPanel {
     }
 
     /**
+     * Gets the index of a component in the stepsContainer.
+     *
+     * @param component The component to find
+     * @return The index of the component, or -1 if not found
+     */
+    private int getComponentIndex(Component component) {
+        Component[] components = stepsContainer.getComponents();
+        for (int i = 0; i < components.length; i++) {
+            if (components[i] == component) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
      * Inner class describing a single Processing Step.
      */
     class ProcessingStepPanel extends JPanel {
@@ -289,6 +305,40 @@ public class PostProcessingForm extends JPanel {
             typePanel.add(typeCombo);
             topPanel.add(Box.createVerticalStrut(10));
             topPanel.add(typePanel, BorderLayout.WEST);
+            // Create button panel with up/down/remove buttons
+            JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
+
+            // Up button
+            JButton upButton = new JButton("↑");
+            upButton.setToolTipText("Move this step up");
+            upButton.setMargin(new Insets(2, 6, 2, 6));
+            upButton.addActionListener((ActionEvent e) -> {
+                int index = getComponentIndex(ProcessingStepPanel.this);
+                if (index > 0) {
+                    stepsContainer.remove(index);
+                    stepsContainer.add(ProcessingStepPanel.this, index - 1);
+                    stepsContainer.revalidate();
+                    stepsContainer.repaint();
+                    scrollToComponent(ProcessingStepPanel.this);
+                }
+            });
+
+            // Down button
+            JButton downButton = new JButton("↓");
+            downButton.setToolTipText("Move this step down");
+            downButton.setMargin(new Insets(2, 6, 2, 6));
+            downButton.addActionListener((ActionEvent e) -> {
+                int index = getComponentIndex(ProcessingStepPanel.this);
+                if (index >= 0 && index < stepsContainer.getComponentCount() - 1) {
+                    stepsContainer.remove(index);
+                    stepsContainer.add(ProcessingStepPanel.this, index + 1);
+                    stepsContainer.revalidate();
+                    stepsContainer.repaint();
+                    scrollToComponent(ProcessingStepPanel.this);
+                }
+            });
+
+            // Remove button
             JButton removeButton = new JButton();
             Icon trashIcon = new FlatSVGIcon("icon/svg/trash.svg", 16, 16);
             removeButton.setIcon(trashIcon);
@@ -298,9 +348,11 @@ public class PostProcessingForm extends JPanel {
                 stepsContainer.revalidate();
                 stepsContainer.repaint();
             });
-            JPanel removePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-            removePanel.add(removeButton);
-            topPanel.add(removePanel, BorderLayout.EAST);
+
+            buttonPanel.add(upButton);
+            buttonPanel.add(downButton);
+            buttonPanel.add(removeButton);
+            topPanel.add(buttonPanel, BorderLayout.EAST);
             add(topPanel);
 
             // Definition des Provider- und Model- Bereichs:

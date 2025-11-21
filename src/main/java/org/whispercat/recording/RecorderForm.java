@@ -544,7 +544,9 @@ public class RecorderForm extends javax.swing.JPanel {
                 if (transcript != null) {
                     logger.info("Transcribed text: " + transcript);
                     transcriptionTextArea.setText(transcript);
-
+                    // Show success notification
+                    Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
+                            "Transcription completed successfully!");
                 } else {
                     logger.warn("Transcription resulted in null");
                 }
