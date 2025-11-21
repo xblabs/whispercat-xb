@@ -27,6 +27,7 @@ This is an enhanced fork by [xblabs](https://github.com/xblabs) with significant
 ✨ **New Architecture:**
 - **Processing Unit Library** - Create reusable processing units (prompt transformations, text replacements) stored in a centralized library
 - **Pipeline System** - Build custom pipelines by combining units from the library, with full enable/disable and reordering control
+- **Automatic Pipeline Optimization** - Intelligently merges consecutive same-model API calls into single chained prompts, reducing costs by 2-3x. [Read the full story →](docs/PIPELINE_OPTIMIZATION.md)
 - **Unit Editor** - Streamlined workflow for creating and editing processing units with auto-save
 - **Inline Unit Creation** - "Create New Unit" button in Pipeline Editor for quick unit creation and immediate pipeline integration
 
@@ -57,6 +58,13 @@ This is an enhanced fork by [xblabs](https://github.com/xblabs) with significant
   - Introduced Processing Unit Library for reusable post-processing components
   - Pipelines now reference units instead of embedding steps directly
   - Unit Editor with auto-save and "Create New Unit" in-pipeline workflow
+- **Automatic Pipeline Optimization** 🚀:
+  - Intelligently chains consecutive same-model API calls into single requests
+  - Reduces costs by 2-3x and execution time by 2-3x for typical pipelines
+  - Uses explicit variable naming (Style 1) for reliable chaining semantics
+  - Fully automatic - no configuration needed
+  - Detailed console logging shows optimization decisions
+  - [Complete technical deep-dive](docs/PIPELINE_OPTIMIZATION.md)
 - **Console Execution Log**: Real-time detailed logging with timestamps for full pipeline visibility
 - **System-Level Notifications**: OS corner pop-ups for transcription/pipeline completion
 - **Dark Mode Default**: Application now starts in dark mode
