@@ -95,7 +95,7 @@ public class UnitLibraryListForm extends JPanel {
             editButton.setIcon(new FlatSVGIcon("icon/svg/edit.svg", 16, 16));
             editButton.setToolTipText("Edit this Processing Unit");
             editButton.addActionListener((ActionEvent e) -> {
-                mainForm.setSelectedMenu(2, 2); // Adjust menu index as needed
+                mainForm.setSelectedMenu(3, 2); // Unit Library -> Create/Edit Unit
                 mainForm.showForm(new UnitEditorForm(configManager, mainForm, unit));
             });
 

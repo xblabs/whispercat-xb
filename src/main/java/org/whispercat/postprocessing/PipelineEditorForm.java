@@ -103,22 +103,15 @@ public class PipelineEditorForm extends JPanel {
         // Bottom panel with buttons
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
 
-        JButton saveButton = new JButton("Save Pipeline");
-        saveButton.addActionListener(e -> savePipeline());
-        bottomPanel.add(saveButton);
+        JButton doneButton = new JButton("Done");
+        doneButton.setToolTipText("Save and return to Pipelines");
+        doneButton.addActionListener(e -> saveAndReturn());
+        bottomPanel.add(doneButton);
         bottomPanel.add(Box.createHorizontalStrut(10));
 
         JButton addUnitButton = new JButton("Add Unit");
         addUnitButton.addActionListener(e -> showAddUnitDialog());
         bottomPanel.add(addUnitButton);
-        bottomPanel.add(Box.createHorizontalStrut(10));
-
-        JButton cancelButton = new JButton("Cancel");
-        cancelButton.addActionListener(e -> {
-            mainForm.setSelectedMenu(2, 2); // Go back to pipeline list
-            mainForm.showForm(new PipelineListForm(configManager, mainForm));
-        });
-        bottomPanel.add(cancelButton);
 
         add(bottomPanel, BorderLayout.SOUTH);
 
@@ -196,7 +189,7 @@ public class PipelineEditorForm extends JPanel {
         });
     }
 
-    private void savePipeline() {
+    private void saveAndReturn() {
         if (!validateData()) {
             return;
         }
@@ -226,10 +219,10 @@ public class PipelineEditorForm extends JPanel {
         }
 
         configManager.savePipeline(pipeline);
-        Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS, "Pipeline saved successfully!");
+        Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS, "Pipeline saved!");
 
         // Go back to pipeline list
-        mainForm.setSelectedMenu(2, 2);
+        mainForm.setSelectedMenu(2, 1);
         mainForm.showForm(new PipelineListForm(configManager, mainForm));
     }
 

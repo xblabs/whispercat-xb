@@ -188,19 +188,12 @@ public class UnitEditorForm extends JPanel {
 
         add(centerPanel, BorderLayout.CENTER);
 
-        // Bottom panel with save button
+        // Bottom panel with done button
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        JButton saveButton = new JButton("Save Unit");
-        saveButton.addActionListener(e -> saveUnit());
-        bottomPanel.add(saveButton);
-
-        JButton cancelButton = new JButton("Cancel");
-        cancelButton.addActionListener(e -> {
-            mainForm.setSelectedMenu(2, 2); // Go back to unit library
-            mainForm.showForm(new UnitLibraryListForm(configManager, mainForm));
-        });
-        bottomPanel.add(Box.createHorizontalStrut(10));
-        bottomPanel.add(cancelButton);
+        JButton doneButton = new JButton("Done");
+        doneButton.setToolTipText("Save and return to Unit Library");
+        doneButton.addActionListener(e -> saveAndReturn());
+        bottomPanel.add(doneButton);
 
         add(bottomPanel, BorderLayout.SOUTH);
 
@@ -271,7 +264,7 @@ public class UnitEditorForm extends JPanel {
         updateFieldsVisibility();
     }
 
-    private void saveUnit() {
+    private void saveAndReturn() {
         if (!validateData()) {
             return;
         }
@@ -309,10 +302,10 @@ public class UnitEditorForm extends JPanel {
         }
 
         configManager.saveProcessingUnit(unit);
-        Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS, "Unit saved successfully!");
+        Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS, "Unit saved!");
 
         // Go back to unit library list
-        mainForm.setSelectedMenu(2, 2);
+        mainForm.setSelectedMenu(3, 1);
         mainForm.showForm(new UnitLibraryListForm(configManager, mainForm));
     }
 
