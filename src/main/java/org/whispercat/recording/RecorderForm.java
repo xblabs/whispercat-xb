@@ -288,6 +288,121 @@ public class RecorderForm extends javax.swing.JPanel {
                         .addContainerGap(237, Short.MAX_VALUE)
         );
 
+        // Enable drag & drop for audio files
+        setupDragAndDrop(centerPanel);
+    }
+
+    /**
+     * Sets up drag and drop support for audio files.
+     */
+    private void setupDragAndDrop(JPanel panel) {
+        panel.setTransferHandler(new TransferHandler() {
+            @Override
+            public boolean canImport(TransferSupport support) {
+                if (!support.isDrop()) {
+                    return false;
+                }
+                try {
+                    // Check if the dropped item is a file
+                    if (support.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                        @SuppressWarnings("unchecked")
+                        List<File> files = (List<File>) support.getTransferable()
+                                .getTransferData(DataFlavor.javaFileListFlavor);
+                        if (files != null && files.size() == 1) {
+                            File file = files.get(0);
+                            String fileName = file.getName().toLowerCase();
+                            // Accept WAV, MP3, OGG, M4A, FLAC files
+                            return fileName.endsWith(".wav") || fileName.endsWith(".mp3") ||
+                                   fileName.endsWith(".ogg") || fileName.endsWith(".m4a") ||
+                                   fileName.endsWith(".flac");
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.error("Error checking drag and drop support", e);
+                }
+                return false;
+            }
+
+            @Override
+            public boolean importData(TransferSupport support) {
+                if (!canImport(support)) {
+                    return false;
+                }
+                try {
+                    @SuppressWarnings("unchecked")
+                    List<File> files = (List<File>) support.getTransferable()
+                            .getTransferData(DataFlavor.javaFileListFlavor);
+                    if (files != null && files.size() == 1) {
+                        File file = files.get(0);
+                        handleDroppedAudioFile(file);
+                        return true;
+                    }
+                } catch (Exception e) {
+                    logger.error("Error importing dropped file", e);
+                    Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                            "Error importing file: " + e.getMessage());
+                }
+                return false;
+            }
+        });
+    }
+
+    /**
+     * Handles a dropped audio file by converting if necessary and transcribing.
+     */
+    private void handleDroppedAudioFile(File file) {
+        logger.info("Dropped file: " + file.getName());
+        File fileToTranscribe = file;
+
+        // Check if OGG file and convert to WAV
+        if (file.getName().toLowerCase().endsWith(".ogg")) {
+            logger.info("Converting OGG file to WAV...");
+            Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
+                    "Converting OGG to WAV...");
+            fileToTranscribe = convertOggToWav(file);
+            if (fileToTranscribe == null) {
+                Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                        "Failed to convert OGG file. Please convert to WAV manually.");
+                return;
+            }
+        }
+
+        // Transcribe the file
+        Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
+                "Transcribing audio file...");
+        new AudioTranscriptionWorker(fileToTranscribe).execute();
+    }
+
+    /**
+     * Converts an OGG file to WAV format using javax.sound.sampled.
+     * Note: This is a basic conversion. For better OGG support, consider adding a library like jorbis.
+     */
+    private File convertOggToWav(File oggFile) {
+        try {
+            // Create temporary WAV file
+            File wavFile = File.createTempFile("whispercat_converted_", ".wav");
+            wavFile.deleteOnExit();
+
+            // Note: javax.sound.sampled doesn't natively support OGG
+            // This will attempt to read using AudioSystem but may fail
+            // Users should ideally use external tools or libraries for proper OGG support
+            try {
+                AudioInputStream audioStream = AudioSystem.getAudioInputStream(oggFile);
+                javax.sound.sampled.AudioSystem.write(audioStream,
+                        javax.sound.sampled.AudioFileFormat.Type.WAVE, wavFile);
+                audioStream.close();
+                logger.info("Successfully converted OGG to WAV");
+                return wavFile;
+            } catch (Exception e) {
+                logger.error("Failed to convert OGG using AudioSystem. OGG codec may not be installed.", e);
+                // Return null to indicate conversion failed
+                // User will need to manually convert using external tools
+                return null;
+            }
+        } catch (Exception e) {
+            logger.error("Error creating temp file for conversion", e);
+            return null;
+        }
     }
 
     private static class PostProcessingItem {

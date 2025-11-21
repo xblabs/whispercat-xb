@@ -278,6 +278,7 @@ public class PostProcessingForm extends JPanel {
     class ProcessingStepPanel extends JPanel {
         private String storedModel = "";
         private JComboBox<String> typeCombo;
+        private JCheckBox enabledCheckBox;
         private JPanel promptPanel;
         private JPanel replacementPanel;
         private JTextArea systemPromptArea;
@@ -300,6 +301,13 @@ public class PostProcessingForm extends JPanel {
             add(Box.createVerticalStrut(10));
             JPanel topPanel = new JPanel(new BorderLayout());
             JPanel typePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+
+            // Add enabled checkbox
+            enabledCheckBox = new JCheckBox("Enabled", true);
+            enabledCheckBox.setToolTipText("Enable or disable this processing step");
+            typePanel.add(enabledCheckBox);
+            typePanel.add(Box.createHorizontalStrut(10));
+
             typePanel.add(new JLabel("Processing Type:"));
             typeCombo = new JComboBox<>(new String[]{"Prompt", "Text Replacement"});
             typePanel.add(typeCombo);
@@ -511,7 +519,8 @@ public class PostProcessingForm extends JPanel {
          * @param stepData the data for this processing step.
          */
         public void loadStepData(ProcessingStepData stepData) {
-
+            // Load enabled state (default to true for backward compatibility)
+            enabledCheckBox.setSelected(stepData.enabled);
 
             typeCombo.setSelectedItem(stepData.type);
             if ("Prompt".equals(stepData.type)) {
@@ -594,6 +603,7 @@ public class PostProcessingForm extends JPanel {
          */
         public ProcessingStepData getProcessingStepData() {
             ProcessingStepData stepData = new ProcessingStepData();
+            stepData.enabled = enabledCheckBox.isSelected();
             stepData.type = (String) typeCombo.getSelectedItem();
             if ("Prompt".equals(stepData.type)) {
                 stepData.provider = (String) providerCombo.getSelectedItem();

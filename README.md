@@ -18,6 +18,46 @@ WhisperCat is your personal companion for capturing audio, transcribing it, and 
 
 ---
 
+## 🚀 xblabs Enhanced Fork
+
+This is an enhanced fork by [xblabs](https://github.com/xblabs) with significant improvements and new features beyond the original WhisperCat project. This fork focuses on enhanced usability, flexibility, and power-user features.
+
+### Key Enhancements in xblabs Fork
+
+✨ **New Features:**
+- **Configurable Post-Processing Models** - Add any OpenAI model (GPT-5 nano, mini, etc.) via GUI settings
+- **Drag & Drop Audio Files** - Drop WAV, MP3, OGG, M4A, FLAC files directly into the app for transcription
+- **OGG File Support** - Automatic conversion of Telegram voice notes and other OGG files
+- **Visual Post-Processing Progress** - Real-time toast notifications showing each processing step
+- **Enable/Disable Processing Steps** - Toggle individual steps in your processing pipeline
+- **Reorderable Processing Steps** - Use up/down arrows to organize your pipeline
+- **Smart Recording Activation** - Hotkey automatically switches to recorder screen from any menu
+- **Sorted Post-Processing List** - Alphabetically organized for easy navigation
+- **Large File Support** - Automatic audio compression for files exceeding OpenAI's 25MB limit
+- **Enhanced Notifications** - Success/warning toasts for transcription completion and errors
+
+🔧 **UX Improvements:**
+- Recording hotkey works from Settings and Logs screens (auto-switches to recorder)
+- Post-processing steps show progress with step numbers (Step 1/3, 2/3, etc.)
+- Visual feedback for all major operations
+- Clearer error messages and warnings
+
+### xblabs Fork Changelog
+
+#### Latest Update (2025-11-21)
+- **Configurable Models**: Add custom OpenAI models via Settings GUI
+- **Drag & Drop**: Drop audio files directly for transcription
+- **OGG Support**: Auto-convert Telegram voice notes (.ogg files)
+- **Visual Progress**: Real-time notifications for post-processing steps
+- **Step Controls**: Enable/disable and reorder processing steps
+- **Smart Hotkeys**: Recording activation works from any screen
+- **File Size Fix**: Auto-compress large audio files (>24MB) before upload
+- **Better UX**: Alphabetically sorted lists, improved notifications
+
+**Repository:** [https://github.com/xblabs/whispercat-xb](https://github.com/xblabs/whispercat-xb)
+
+---
+
 ## Features
 - **v1.4.0: Open Web UI Support**:  
   WhisperCat now supports transcription via the Open Web UI, a flexible and user-friendly web interface that provides powerful transcription services. This integration allows you to process your recordings using modern, cloud-based technologies and even leverage free, open-source models for transcription. For more details about configuration and available models, please visit [openwebui.com](https://openwebui.com/).
@@ -82,21 +122,146 @@ Feel free to contribute any of these features or suggest new ones in the issues 
 
 ---
 
-## Development
+## Development & Compilation
 
-For developers who want to contribute to WhisperCat, follow these steps:
+For developers who want to contribute to WhisperCat or build from source, follow these comprehensive instructions:
+
+### Prerequisites
+
+**Required Software:**
+- **Java Development Kit (JDK) 11 or higher** - [Download from Oracle](https://www.oracle.com/java/technologies/downloads/) or [Adoptium](https://adoptium.net/)
+- **Apache Maven 3.6+** - [Download from Apache Maven](https://maven.apache.org/download.cgi)
+- **Git** - [Download from git-scm.com](https://git-scm.com/downloads)
+
+**Verify Installation:**
+```sh
+# Check Java version (should be 11 or higher)
+java -version
+
+# Check Maven installation
+mvn -version
+
+# Check Git installation
+git --version
+```
+
+### Building from Source
 
 1. **Clone the Repository:**
 
     ```sh
+    # Original repository
     git clone https://github.com/ddxy/whispercat.git
+
+    # OR clone the xblabs enhanced fork
+    git clone https://github.com/xblabs/whispercat-xb.git
     ```
 
-2. **Build the Project with Maven:**
+2. **Navigate to Project Directory:**
 
     ```sh
+    cd whispercat-xb  # or 'whispercat' for original
+    ```
+
+3. **Build the Project with Maven:**
+
+    ```sh
+    # Clean and package (skips tests)
+    mvn clean package -DskipTests
+
+    # OR build with tests
     mvn clean package
     ```
+
+    This creates a JAR file in the `target/` directory:
+    - `Audiorecorder-1.0-SNAPSHOT-jar-with-dependencies.jar`
+
+4. **Run the Application:**
+
+    ```sh
+    # Run directly with Maven
+    mvn exec:java -Dexec.mainClass="org.whispercat.AudioRecorderUI"
+
+    # OR run the compiled JAR
+    java -jar target/Audiorecorder-1.0-SNAPSHOT-jar-with-dependencies.jar
+    ```
+
+### Development Workflow
+
+**IDE Setup:**
+- **IntelliJ IDEA**: Open as Maven project
+- **Eclipse**: Import as "Existing Maven Project"
+- **VS Code**: Install "Java Extension Pack" and "Maven for Java"
+
+**Common Maven Commands:**
+```sh
+# Clean build artifacts
+mvn clean
+
+# Compile without running tests
+mvn compile -DskipTests
+
+# Run tests only
+mvn test
+
+# Generate IDE project files
+mvn idea:idea     # for IntelliJ
+mvn eclipse:eclipse  # for Eclipse
+
+# View dependency tree
+mvn dependency:tree
+```
+
+### Project Structure
+
+```
+whispercat-xb/
+├── src/
+│   └── main/
+│       ├── java/
+│       │   └── org/whispercat/
+│       │       ├── AudioRecorderUI.java
+│       │       ├── ConfigManager.java
+│       │       ├── MainForm.java
+│       │       ├── postprocessing/
+│       │       ├── recording/
+│       │       └── settings/
+│       └── resources/
+│           ├── whispercat.svg
+│           └── icon/
+├── pom.xml
+└── README.md
+```
+
+### Troubleshooting Build Issues
+
+**Problem: Maven not found**
+```sh
+# Add Maven to PATH (example for Linux/Mac)
+export PATH=/path/to/maven/bin:$PATH
+
+# For Windows, add to System Environment Variables
+```
+
+**Problem: Java version mismatch**
+```sh
+# Check JAVA_HOME
+echo $JAVA_HOME  # Linux/Mac
+echo %JAVA_HOME%  # Windows
+
+# Set JAVA_HOME if needed
+export JAVA_HOME=/path/to/jdk  # Linux/Mac
+set JAVA_HOME=C:\path\to\jdk   # Windows
+```
+
+**Problem: Dependencies not downloading**
+```sh
+# Force update dependencies
+mvn clean install -U
+
+# Clear Maven cache
+rm -rf ~/.m2/repository/*
+```
 
 ---
 

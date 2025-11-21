@@ -1,6 +1,8 @@
 package org.whispercat.postprocessing;
 
 import org.whispercat.ConfigManager;
+import org.whispercat.Notificationmanager;
+import org.whispercat.ToastNotification;
 import org.whispercat.postprocessing.clients.OpenWebUIProcessClient;
 import org.whispercat.recording.OpenAIClient;
 
@@ -34,9 +36,38 @@ public class PostProcessingService {
      */
     public String applyPostProcessing(String originalText, PostProcessingData postProcessingData) {
         String processedText = originalText;
+        int totalSteps = postProcessingData.steps.size();
+        int enabledStepCount = 0;
+        int currentStep = 0;
+
+        // Count enabled steps
+        for (ProcessingStepData step : postProcessingData.steps) {
+            if (step.enabled) {
+                enabledStepCount++;
+            }
+        }
+
+        // Show initial notification
+        if (enabledStepCount > 0) {
+            Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
+                    "Starting post-processing (" + enabledStepCount + " steps)...");
+        }
 
         // Iterate over all defined steps.
         for (ProcessingStepData step : postProcessingData.steps) {
+            // Skip disabled steps
+            if (!step.enabled) {
+                logger.info("Skipping disabled processing step: " + step.type);
+                continue;
+            }
+
+            currentStep++;
+            String stepDescription = getStepDescription(step, currentStep, enabledStepCount);
+
+            // Show notification for current step
+            Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
+                    stepDescription);
+
             if ("Prompt".equalsIgnoreCase(step.type)) {
                 // Use OpenAIClient for a synchronous call.
                 processedText = performPromptProcessing(processedText, step);
@@ -49,7 +80,34 @@ public class PostProcessingService {
             }
         }
 
+        // Show completion notification
+        if (enabledStepCount > 0) {
+            Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
+                    "Post-processing completed!");
+        }
+
         return processedText;
+    }
+
+    /**
+     * Generates a descriptive message for the current processing step.
+     */
+    private String getStepDescription(ProcessingStepData step, int currentStep, int totalSteps) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Step ").append(currentStep).append("/").append(totalSteps).append(": ");
+
+        if ("Prompt".equalsIgnoreCase(step.type)) {
+            sb.append("Processing with ").append(step.provider);
+            if (step.model != null && !step.model.isEmpty()) {
+                sb.append(" (").append(step.model).append(")");
+            }
+        } else if ("Text Replacement".equalsIgnoreCase(step.type)) {
+            sb.append("Replacing text");
+        } else {
+            sb.append(step.type);
+        }
+
+        return sb.toString();
     }
 
     /**

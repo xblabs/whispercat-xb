@@ -5,6 +5,8 @@ package org.whispercat.postprocessing;
  */
 public class ProcessingStepData {
     public String type;             // "Prompt" or "Text Replacement"
+    public boolean enabled = true;  // Whether this step is enabled
+
     // For Prompt:
     public String provider;
     public String model;
