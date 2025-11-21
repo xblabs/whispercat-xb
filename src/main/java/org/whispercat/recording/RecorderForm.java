@@ -158,25 +158,21 @@ public class RecorderForm extends javax.swing.JPanel {
         postProcessingContainerPanel.setBorder(new EmptyBorder(10, 50, 50, 50));
         postProcessingContainerPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
+        // Responsive options panel with FlowLayout (flexbox-style)
+        JPanel optionsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 5));
+        optionsPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        optionsPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+
         // New checkbox to control auto-paste from clipboard
         JCheckBox autoPasteCheckBox = new JCheckBox("Paste from clipboard (Ctrl+V)");
-        autoPasteCheckBox.setHorizontalTextPosition(SwingConstants.LEFT);
-        autoPasteCheckBox.setAlignmentX(Component.LEFT_ALIGNMENT);
-        autoPasteCheckBox.setSelected(configManager.isAutoPasteEnabled()); // Reads the value from ConfigManager
+        autoPasteCheckBox.setSelected(configManager.isAutoPasteEnabled());
         autoPasteCheckBox.addActionListener(e -> {
             configManager.setAutoPasteEnabled(autoPasteCheckBox.isSelected());
         });
-        postProcessingContainerPanel.add(autoPasteCheckBox);
-        postProcessingContainerPanel.add(Box.createVerticalStrut(10));
 
         enablePostProcessingCheckBox.setHorizontalTextPosition(SwingConstants.LEFT);
-        enablePostProcessingCheckBox.setAlignmentX(Component.LEFT_ALIGNMENT);
-        postProcessingContainerPanel.add(enablePostProcessingCheckBox);
 
-        JCheckBox loadOnStartupCheckBox = new JCheckBox(
-                "<html>Activate on startup</html>");
-        loadOnStartupCheckBox.setHorizontalTextPosition(SwingConstants.LEFT);
-        loadOnStartupCheckBox.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JCheckBox loadOnStartupCheckBox = new JCheckBox("Activate on startup");
         loadOnStartupCheckBox.setVisible(false); // initially hidden
         loadOnStartupCheckBox.addActionListener(e -> {
             if (loadOnStartupCheckBox.isSelected()) {
@@ -185,22 +181,11 @@ public class RecorderForm extends javax.swing.JPanel {
                 configManager.setPostProcessingOnStartup(false);
             }
         });
-        postProcessingContainerPanel.add(Box.createVerticalStrut(10));
-        postProcessingContainerPanel.add(loadOnStartupCheckBox);
 
-
-        JPanel cardPanel = new JPanel(new CardLayout());
-        cardPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        JPanel postProcessingSelectionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        postProcessingSelectionPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         JLabel selectLabel = new JLabel("Select Post-Processing:");
-        selectLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        postProcessingSelectionPanel.add(selectLabel);
-        postProcessingContainerPanel.add(Box.createVerticalStrut(10));
 
         postProcessingSelectComboBox = new JComboBox<>();
         populatePostProcessingComboBox();
-        postProcessingSelectComboBox.setAlignmentX(Component.LEFT_ALIGNMENT);
         postProcessingSelectComboBox.addItemListener(e -> {
             if (e.getStateChange() == ItemEvent.SELECTED) {
                 PostProcessingItem selectedItem = (PostProcessingItem) e.getItem();
@@ -209,14 +194,30 @@ public class RecorderForm extends javax.swing.JPanel {
                 }
             }
         });
-        postProcessingSelectionPanel.add(postProcessingSelectComboBox);
+
+        // CardPanel for pipeline selection (show/hide based on checkbox)
+        JPanel cardPanel = new JPanel(new CardLayout());
+        cardPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JPanel pipelineSelectionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        pipelineSelectionPanel.add(selectLabel);
+        pipelineSelectionPanel.add(postProcessingSelectComboBox);
+
         JPanel placeholderPanel = new JPanel();
-        placeholderPanel.setPreferredSize(postProcessingSelectionPanel.getPreferredSize());
-        placeholderPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        placeholderPanel.setPreferredSize(new Dimension(0, 0));
+
         cardPanel.add(placeholderPanel, "none");
-        cardPanel.add(postProcessingSelectionPanel, "active");
+        cardPanel.add(pipelineSelectionPanel, "active");
         CardLayout cl = (CardLayout) cardPanel.getLayout();
         cl.show(cardPanel, "none");
+
+        // Add controls to responsive options panel
+        optionsPanel.add(autoPasteCheckBox);
+        optionsPanel.add(enablePostProcessingCheckBox);
+        optionsPanel.add(loadOnStartupCheckBox);
+
+        postProcessingContainerPanel.add(optionsPanel);
+        postProcessingContainerPanel.add(Box.createVerticalStrut(10));
         postProcessingContainerPanel.add(cardPanel);
 
 
@@ -692,6 +693,11 @@ public class RecorderForm extends javax.swing.JPanel {
                     // Show success notification
                     Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
                             "Transcription completed!");
+                    // Show system-level notification
+                    TrayIconManager trayManager = AudioRecorderUI.getTrayIconManager();
+                    if (trayManager != null) {
+                        trayManager.showSystemNotification("WhisperCat", "Transcription completed");
+                    }
                 } else {
                     logger.warn("Transcription resulted in null");
                     console.logError("Transcription returned null");
@@ -713,6 +719,11 @@ public class RecorderForm extends javax.swing.JPanel {
                             // Show pipeline completion toast
                             Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
                                     "Post-processing completed!");
+                            // Show system-level notification
+                            TrayIconManager trayManager = AudioRecorderUI.getTrayIconManager();
+                            if (trayManager != null) {
+                                trayManager.showSystemNotification("WhisperCat", "Post-processing completed");
+                            }
                             playClickSound();
                             copyTranscriptionToClipboard(processedText);
                             pasteFromClipboard();

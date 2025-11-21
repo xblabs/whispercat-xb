@@ -49,12 +49,12 @@ public class ToastNotification extends JDialog {
             }
         };
         contentPanel.setBackground(getBackgroundColor());
-        contentPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
 
 
         contentPanel.setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(0, 0, 0, 10);
+        gbc.insets = new Insets(0, 0, 0, 5);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
 
         JTextArea messageArea = new JTextArea(message);
@@ -64,7 +64,7 @@ public class ToastNotification extends JDialog {
         messageArea.setForeground(new Color(50, 50, 50));
         messageArea.setOpaque(false);
         messageArea.setBackground(new Color(0, 0, 0, 0));
-        messageArea.setFont(new Font(UIManager.getFont("Label.font").getName(), Font.PLAIN, 15));
+        messageArea.setFont(new Font(UIManager.getFont("Label.font").getName(), Font.PLAIN, 13));
         messageArea.setBorder(null);
 
         messageArea.addMouseListener(new MouseAdapter() {
@@ -106,14 +106,14 @@ public class ToastNotification extends JDialog {
     private Color getBackgroundColor() {
         switch (type) {
             case SUCCESS:
-                return new Color(77, 175, 80, 200);
+                return new Color(182, 215, 168, 220);  // Pastel green
             case INFO:
-                return new Color(33, 150, 243, 200);
+                return new Color(159, 197, 232, 220);  // Pastel blue
             case WARNING:
-                return new Color(255, 221, 0, 200);
+                return new Color(255, 245, 157, 220);  // Pastel yellow
             case ERROR:
             default:
-                return new Color(244, 67, 54, 126);
+                return new Color(244, 143, 177, 220);  // Pastel red
         }
     }
 

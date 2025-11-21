@@ -24,35 +24,49 @@ This is an enhanced fork by [xblabs](https://github.com/xblabs) with significant
 
 ### Key Enhancements in xblabs Fork
 
-✨ **New Features:**
+✨ **New Architecture:**
+- **Processing Unit Library** - Create reusable processing units (prompt transformations, text replacements) stored in a centralized library
+- **Pipeline System** - Build custom pipelines by combining units from the library, with full enable/disable and reordering control
+- **Unit Editor** - Streamlined workflow for creating and editing processing units with auto-save
+- **Inline Unit Creation** - "Create New Unit" button in Pipeline Editor for quick unit creation and immediate pipeline integration
+
+🎯 **Visibility & Monitoring:**
+- **Console Execution Log** - Real-time timestamped log showing detailed pipeline execution:
+  - Transcription start/completion with file info
+  - Pipeline start/end with unit counts
+  - Step-by-step progress (Step 1/3, 2/3, etc.)
+  - Compiled prompts (system + user) sent to APIs
+  - API call status and errors
+- **System-Level Notifications** - Subtle OS corner pop-ups for transcription and pipeline completion (works when app is minimized)
+- **Refined Toast Notifications** - Pastel colors, reduced padding, only for high-level events
+
+🔧 **UX Improvements:**
+- **Responsive Layout** - Controls (paste from clipboard, enable post-processing, etc.) now flow horizontally with responsive wrapping
+- **Dark Mode Default** - Application starts in dark mode for reduced eye strain
 - **Configurable Post-Processing Models** - Add any OpenAI model (GPT-5 nano, mini, etc.) via GUI settings
 - **Drag & Drop Audio Files** - Drop WAV, MP3, OGG, M4A, FLAC files directly into the app for transcription
 - **OGG File Support** - Automatic conversion of Telegram voice notes and other OGG files
-- **Visual Post-Processing Progress** - Real-time toast notifications showing each processing step
-- **Enable/Disable Processing Steps** - Toggle individual steps in your processing pipeline
-- **Reorderable Processing Steps** - Use up/down arrows to organize your pipeline
 - **Smart Recording Activation** - Hotkey automatically switches to recorder screen from any menu
-- **Sorted Post-Processing List** - Alphabetically organized for easy navigation
+- **Sorted Lists** - Alphabetically organized pipelines and units for easy navigation
 - **Large File Support** - Automatic audio compression for files exceeding OpenAI's 25MB limit
-- **Enhanced Notifications** - Success/warning toasts for transcription completion and errors
-
-🔧 **UX Improvements:**
-- Recording hotkey works from Settings and Logs screens (auto-switches to recorder)
-- Post-processing steps show progress with step numbers (Step 1/3, 2/3, etc.)
-- Visual feedback for all major operations
-- Clearer error messages and warnings
 
 ### xblabs Fork Changelog
 
 #### Latest Update (2025-11-21)
+- **Major Architecture Overhaul**:
+  - Introduced Processing Unit Library for reusable post-processing components
+  - Pipelines now reference units instead of embedding steps directly
+  - Unit Editor with auto-save and "Create New Unit" in-pipeline workflow
+- **Console Execution Log**: Real-time detailed logging with timestamps for full pipeline visibility
+- **System-Level Notifications**: OS corner pop-ups for transcription/pipeline completion
+- **Dark Mode Default**: Application now starts in dark mode
+- **Responsive Layout**: Controls flow horizontally with responsive wrapping (flexbox-style)
+- **Refined Toast Notifications**: Pastel colors, significantly reduced padding, high-level events only
 - **Configurable Models**: Add custom OpenAI models via Settings GUI
-- **Drag & Drop**: Drop audio files directly for transcription
+- **Drag & Drop**: Drop audio files (WAV, MP3, OGG, M4A, FLAC) directly for transcription
 - **OGG Support**: Auto-convert Telegram voice notes (.ogg files)
-- **Visual Progress**: Real-time notifications for post-processing steps
-- **Step Controls**: Enable/disable and reorder processing steps
 - **Smart Hotkeys**: Recording activation works from any screen
 - **File Size Fix**: Auto-compress large audio files (>24MB) before upload
-- **Better UX**: Alphabetically sorted lists, improved notifications
 
 **Repository:** [https://github.com/xblabs/whispercat-xb](https://github.com/xblabs/whispercat-xb)
 

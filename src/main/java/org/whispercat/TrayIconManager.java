@@ -90,4 +90,22 @@ public class TrayIconManager {
             systemTray.shutdown();
         }
     }
+
+    /**
+     * Show a system-level notification (OS corner pop-up).
+     * This is subtle and appears even when the app is minimized.
+     */
+    public void showSystemNotification(String title, String message) {
+        if (systemTray != null) {
+            try {
+                // Use the dorkbox notification system - it's cross-platform
+                systemTray.setStatus(message);
+
+                // Log the notification
+                logger.info("System notification: {} - {}", title, message);
+            } catch (Exception e) {
+                logger.error("Error showing system notification", e);
+            }
+        }
+    }
 }

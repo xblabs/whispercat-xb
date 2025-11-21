@@ -3,7 +3,7 @@ package org.whispercat;
 import com.formdev.flatlaf.FlatClientProperties;
 import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.fonts.roboto.FlatRobotoFont;
-import com.formdev.flatlaf.themes.FlatMacLightLaf;
+import com.formdev.flatlaf.themes.FlatMacDarkLaf;
 import org.whispercat.recording.RecorderForm;
 
 import javax.swing.*;
@@ -65,7 +65,7 @@ public class AudioRecorderUI extends javax.swing.JFrame {
         FlatRobotoFont.install();
         FlatLaf.registerCustomDefaultsSource("theme");
         UIManager.put("defaultFont", new Font(FlatRobotoFont.FAMILY, Font.PLAIN, 13));
-        FlatMacLightLaf.setup();
+        FlatMacDarkLaf.setup();
         java.awt.EventQueue.invokeLater(() -> {
             app = new AudioRecorderUI();
 //              app.applyComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
