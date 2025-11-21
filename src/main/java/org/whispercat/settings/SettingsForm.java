@@ -56,6 +56,7 @@ public class SettingsForm extends JPanel {
     private final JComboBox<String> groqModelComboBox;
 
     private JTextField openaiApiKeyField;
+    private JTextField customOpenAIModelsField;
 
     private JTextField grokApiKeyField;
 
@@ -261,6 +262,35 @@ public class SettingsForm extends JPanel {
         apiGbc.weightx = 1.0;
         apiGbc.anchor = GridBagConstraints.WEST;
         apiSettingsPanel.add(openaiApiKeyField, apiGbc);
+
+        apiRow++;
+
+// ----- Custom OpenAI Models -----
+        apiGbc.gridx = 0;
+        apiGbc.gridy = apiRow;
+        apiGbc.gridwidth = 1;
+        apiGbc.weightx = 0;
+        apiGbc.anchor = GridBagConstraints.EAST;
+        apiSettingsPanel.add(new JLabel("Custom OpenAI Models:"), apiGbc);
+        customOpenAIModelsField = new JTextField(20);
+        apiGbc.gridx = 1;
+        apiGbc.gridy = apiRow;
+        apiGbc.gridwidth = 2;
+        apiGbc.weightx = 1.0;
+        apiGbc.anchor = GridBagConstraints.WEST;
+        apiSettingsPanel.add(customOpenAIModelsField, apiGbc);
+
+        apiRow++;
+
+// ----- Hint Label for Custom OpenAI Models -----
+        JLabel modelsHintLabel = new JLabel("Comma-separated list (e.g., gpt-4o-mini, gpt-5-nano, gpt-5-mini)");
+        modelsHintLabel.setFont(new Font("Dialog", Font.ITALIC, 10));
+        modelsHintLabel.setForeground(Color.GRAY);
+        apiGbc.gridx = 1;
+        apiGbc.gridy = apiRow;
+        apiGbc.gridwidth = 2;
+        apiGbc.anchor = GridBagConstraints.WEST;
+        apiSettingsPanel.add(modelsHintLabel, apiGbc);
 
         apiRow++;
 // ----- Separator between OpenAI and Grok -----
@@ -760,6 +790,8 @@ public class SettingsForm extends JPanel {
 
         String apiKey = configManager.getProperty("apiKey");
         openaiApiKeyField.setText(apiKey != null ? apiKey : "");
+        String customModels = configManager.getCustomOpenAIModelsString();
+        customOpenAIModelsField.setText(customModels != null ? customModels : "");
         String grokApiKey = configManager.getProperty("grokApiKey");
         grokApiKeyField.setText(apiKey != null ? grokApiKey : "");
         String openwebUIApiKey = configManager.getOpenWebUIApiKey();
@@ -818,6 +850,10 @@ public class SettingsForm extends JPanel {
         // Save OpenAI Whisper API Key
         String openaiKey = openaiApiKeyField.getText();
         configManager.setProperty("apiKey", openaiKey);
+
+        // Save Custom OpenAI Models
+        String customModels = customOpenAIModelsField.getText();
+        configManager.setCustomOpenAIModelsFromString(customModels);
 
         String grokApiKey = grokApiKeyField.getText();
         configManager.setProperty("grokApiKey", grokApiKey);

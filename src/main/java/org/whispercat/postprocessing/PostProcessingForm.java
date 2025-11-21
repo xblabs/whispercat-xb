@@ -315,7 +315,9 @@ public class PostProcessingForm extends JPanel {
             JLabel modelLabel = new JLabel("Model:");
             providerPanel.add(modelLabel);
             providerPanel.add(Box.createHorizontalStrut(5));
-            modelCombo = new JComboBox<>(new String[]{"gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"});
+            // Load custom OpenAI models from configuration
+            List<String> customModels = configManager.getCustomOpenAIModels();
+            modelCombo = new JComboBox<>(customModels.toArray(new String[0]));
             providerPanel.add(modelCombo);
             // Bei Änderung des Providers wird die Modell-Combo aktualisiert.
             providerCombo.addItemListener(e -> {
@@ -430,8 +432,9 @@ public class PostProcessingForm extends JPanel {
                 }
             } else { // OpenAI
                 String previous = previousSelection;
-                String[] openaiModels = {"gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"};
-                for (String m : openaiModels) {
+                // Load custom OpenAI models from configuration
+                List<String> customModels = configManager.getCustomOpenAIModels();
+                for (String m : customModels) {
                     modelCombo.addItem(m);
                 }
                 for (int i = 0; i < modelCombo.getItemCount(); i++) {

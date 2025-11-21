@@ -287,4 +287,66 @@ public class ConfigManager {
     public void setOpenWebUIServerUrl(String url) {
         properties.setProperty("openWebUIServerUrl", url);
     }
+
+    /**
+     * Gets the list of custom OpenAI models configured by the user.
+     * Returns default models if no custom models are configured.
+     *
+     * @return List of model names
+     */
+    public List<String> getCustomOpenAIModels() {
+        String modelsJson = properties.getProperty("customOpenAIModels", "");
+        if (modelsJson.trim().isEmpty()) {
+            // Return default models if not configured
+            return Arrays.asList("gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo");
+        }
+        try {
+            Gson gson = new Gson();
+            String[] modelsArray = gson.fromJson(modelsJson, String[].class);
+            return Arrays.asList(modelsArray);
+        } catch (Exception e) {
+            logger.error("Failed to parse custom OpenAI models, returning defaults", e);
+            return Arrays.asList("gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo");
+        }
+    }
+
+    /**
+     * Saves the list of custom OpenAI models.
+     *
+     * @param models List of model names to save
+     */
+    public void setCustomOpenAIModels(List<String> models) {
+        Gson gson = new Gson();
+        String json = gson.toJson(models);
+        properties.setProperty("customOpenAIModels", json);
+        saveConfig();
+    }
+
+    /**
+     * Gets the custom OpenAI models as a comma-separated string for display in UI.
+     *
+     * @return Comma-separated model names
+     */
+    public String getCustomOpenAIModelsString() {
+        List<String> models = getCustomOpenAIModels();
+        return String.join(", ", models);
+    }
+
+    /**
+     * Sets custom OpenAI models from a comma-separated string.
+     *
+     * @param modelsString Comma-separated model names
+     */
+    public void setCustomOpenAIModelsFromString(String modelsString) {
+        if (modelsString == null || modelsString.trim().isEmpty()) {
+            // Reset to defaults
+            setCustomOpenAIModels(Arrays.asList("gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"));
+            return;
+        }
+        List<String> models = Arrays.stream(modelsString.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+        setCustomOpenAIModels(models);
+    }
 }
