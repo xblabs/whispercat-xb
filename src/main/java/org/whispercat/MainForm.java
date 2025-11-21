@@ -9,6 +9,10 @@ import org.whispercat.sidemenu.Menu;
 import org.whispercat.sidemenu.MenuAction;
 import org.whispercat.postprocessing.PostProcessingListForm;
 import org.whispercat.postprocessing.PostProcessingForm;
+import org.whispercat.postprocessing.PipelineListForm;
+import org.whispercat.postprocessing.PipelineEditorForm;
+import org.whispercat.postprocessing.UnitLibraryListForm;
+import org.whispercat.postprocessing.UnitEditorForm;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -64,6 +68,8 @@ public class MainForm extends JLayeredPane {
         add(panelBody);
 
         configManager = new ConfigManager();
+        // Migrate old post-processing data to new Pipeline architecture
+        configManager.migrateOldPostProcessingData();
         extractNativeLibraries();
         String hotkey = configManager.getKeyCombination();
         globalHotkeyListener = new GlobalHotkeyListener(this, hotkey, configManager.getKeySequence());
@@ -115,11 +121,20 @@ public class MainForm extends JLayeredPane {
                     action.cancel();
                 }
             } else if (index == 2) {
+                // Pipelines menu
                 if (subIndex == 1) {
-                    showForm(new PostProcessingListForm(configManager, this));
+                    showForm(new PipelineListForm(configManager, this));
                 }
                 if (subIndex == 2) {
-                    showForm(new PostProcessingForm(configManager, null));
+                    showForm(new PipelineEditorForm(configManager, this, null));
+                }
+            } else if (index == 3) {
+                // Unit Library menu
+                if (subIndex == 1) {
+                    showForm(new UnitLibraryListForm(configManager, this));
+                }
+                if (subIndex == 2) {
+                    showForm(new UnitEditorForm(configManager, this, null));
                 }
             }
             else if (index == 9) {

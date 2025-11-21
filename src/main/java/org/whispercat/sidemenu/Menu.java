@@ -17,7 +17,8 @@ public class Menu extends JPanel {
             {"~~"},
             {"Record"},
             {"Settings", "Options", "Logs"},
-            {"Post Processings", "Post Processings", "Create/Edit Post Processing"},
+            {"Pipelines", "Pipelines", "Create/Edit Pipeline"},
+            {"Unit Library", "Unit Library", "Create/Edit Unit"},
 
     };
 

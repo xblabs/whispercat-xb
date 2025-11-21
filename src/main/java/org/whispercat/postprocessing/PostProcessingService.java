@@ -15,6 +15,7 @@ public class PostProcessingService {
     // OpenAIClient instance used to make synchronous calls to the API.
     private OpenAIClient openAIClient;
     private OpenWebUIProcessClient openWebUIClient;
+    private ConfigManager configManager;
 
     /**
      * Constructs the PostProcessingService with the given ConfigManager.
@@ -23,6 +24,7 @@ public class PostProcessingService {
      * @param configManager The ConfigManager that contains configuration settings.
      */
     public PostProcessingService(ConfigManager configManager) {
+        this.configManager = configManager;
         this.openAIClient = new OpenAIClient(configManager);
         this.openWebUIClient = new OpenWebUIProcessClient(configManager);
     }
@@ -139,6 +141,133 @@ public class PostProcessingService {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        }
+        return inputText;
+    }
+
+    /**
+     * Executes a pipeline by resolving unit references and applying enabled units in sequence.
+     *
+     * @param originalText The initial transcribed text.
+     * @param pipeline     The pipeline configuration to execute.
+     * @return The processed text after all enabled units.
+     */
+    public String applyPipeline(String originalText, Pipeline pipeline) {
+        if (!pipeline.enabled) {
+            logger.info("Pipeline '{}' is disabled, skipping execution", pipeline.title);
+            return originalText;
+        }
+
+        String processedText = originalText;
+        int enabledUnitCount = 0;
+        int currentUnit = 0;
+
+        // Count enabled units
+        for (PipelineUnitReference ref : pipeline.unitReferences) {
+            if (ref.enabled) {
+                enabledUnitCount++;
+            }
+        }
+
+        // Show initial notification
+        if (enabledUnitCount > 0) {
+            Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
+                    "Starting pipeline '" + pipeline.title + "' (" + enabledUnitCount + " units)...");
+        }
+
+        // Iterate over unit references
+        for (PipelineUnitReference ref : pipeline.unitReferences) {
+            // Skip disabled units
+            if (!ref.enabled) {
+                logger.info("Skipping disabled unit reference in pipeline: {}", ref.unitUuid);
+                continue;
+            }
+
+            // Resolve the unit from the library
+            ProcessingUnit unit = configManager.getProcessingUnitByUuid(ref.unitUuid);
+            if (unit == null) {
+                logger.warn("Unit with UUID {} not found, skipping", ref.unitUuid);
+                Notificationmanager.getInstance().showNotification(ToastNotification.Type.WARNING,
+                        "Unit not found: " + ref.unitUuid);
+                continue;
+            }
+
+            currentUnit++;
+            String unitDescription = getUnitDescription(unit, currentUnit, enabledUnitCount);
+
+            // Show notification for current unit
+            Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
+                    unitDescription);
+
+            // Process based on unit type
+            if ("Prompt".equalsIgnoreCase(unit.type)) {
+                processedText = performPromptProcessingWithUnit(processedText, unit);
+            } else if ("Text Replacement".equalsIgnoreCase(unit.type)) {
+                processedText = processedText.replace(unit.textToReplace, unit.replacementText);
+            } else {
+                logger.warn("Unknown unit type: {}", unit.type);
+            }
+        }
+
+        // Show completion notification
+        if (enabledUnitCount > 0) {
+            Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
+                    "Pipeline completed!");
+        }
+
+        return processedText;
+    }
+
+    /**
+     * Generates a descriptive message for the current processing unit.
+     */
+    private String getUnitDescription(ProcessingUnit unit, int currentUnit, int totalUnits) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Unit ").append(currentUnit).append("/").append(totalUnits).append(": ");
+        sb.append(unit.name);
+
+        if ("Prompt".equalsIgnoreCase(unit.type)) {
+            sb.append(" (").append(unit.provider);
+            if (unit.model != null && !unit.model.isEmpty()) {
+                sb.append(" - ").append(unit.model);
+            }
+            sb.append(")");
+        } else if ("Text Replacement".equalsIgnoreCase(unit.type)) {
+            sb.append(" (Replace: '").append(unit.textToReplace).append("')");
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * Synchronously processes the text using a ProcessingUnit's prompt configuration.
+     *
+     * @param inputText The input text to process.
+     * @param unit      The processing unit configuration.
+     * @return The processed text from the API response.
+     */
+    private String performPromptProcessingWithUnit(String inputText, ProcessingUnit unit) {
+        logger.info("Pre-processing input with unit: {}", unit.name);
+        logger.info("Transcript: {}", inputText);
+
+        // Combine the user prompt with the input text.
+        String fullUserPrompt = unit.userPrompt.replaceAll("\\{\\{input}}", inputText);
+        logger.info("Post-processing input: {}", fullUserPrompt);
+
+        try {
+            if (unit.provider.equalsIgnoreCase("OpenAI")) {
+                logger.info("Processing using OpenAI API.");
+                String result = openAIClient.processText(unit.systemPrompt, fullUserPrompt, unit.model);
+                return result;
+            } else if (unit.provider.equalsIgnoreCase("Open WebUI")) {
+                logger.info("Processing using Open WebUI.");
+                String result = openWebUIClient.processText(unit.systemPrompt, fullUserPrompt, unit.model);
+                return result;
+            }
+        } catch (IOException e) {
+            logger.error("Error processing with unit: {}", unit.name, e);
+            Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                    "Error processing unit: " + unit.name);
         }
         return inputText;
     }

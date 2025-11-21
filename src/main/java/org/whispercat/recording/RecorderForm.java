@@ -4,6 +4,7 @@ import com.formdev.flatlaf.extras.FlatSVGIcon;
 import com.formdev.flatlaf.util.UIScale;
 import org.whispercat.*;
 import org.whispercat.postprocessing.PostProcessingData;
+import org.whispercat.postprocessing.Pipeline;
 import org.whispercat.postprocessing.PostProcessingService;
 import org.whispercat.recording.clients.FasterWhisperTranscribeClient;
 import org.whispercat.recording.clients.OpenAITranscribeClient;
@@ -50,7 +51,7 @@ public class RecorderForm extends javax.swing.JPanel {
 
 
     private JComboBox<PostProcessingItem> postProcessingSelectComboBox;
-    private List<PostProcessingData> postProcessingJSONList;
+    private List<Pipeline> pipelineList;
 
     public RecorderForm(ConfigManager configManager) {
         this.configManager = configManager;
@@ -423,25 +424,25 @@ public class RecorderForm extends javax.swing.JPanel {
 
     private void populatePostProcessingComboBox() {
         postProcessingSelectComboBox.removeAllItems();
-        // Get the list of JSON strings.
-        postProcessingJSONList = configManager.getPostProcessingDataList();
-        String lastUsedPostProcessingUUID = configManager.getLastUsedPostProcessingUUID();
+        // Get the list of pipelines (only show enabled ones)
+        pipelineList = configManager.getPipelines();
+        String lastUsedPipelineUUID = configManager.getLastUsedPipelineUUID();
         Integer lastUsedIndex = null;
-        for (int index = 0; index < postProcessingJSONList.size(); index++) {
-            PostProcessingData data = postProcessingJSONList.get(index);
-            PostProcessingItem item = new PostProcessingItem(data.title, data.uuid);
-            if (data.uuid.equals(lastUsedPostProcessingUUID)) {
-                lastUsedIndex = index;
+        for (int index = 0; index < pipelineList.size(); index++) {
+            Pipeline pipeline = pipelineList.get(index);
+            // Only show enabled pipelines in the dropdown
+            if (pipeline.enabled) {
+                PostProcessingItem item = new PostProcessingItem(pipeline.title, pipeline.uuid);
+                if (pipeline.uuid.equals(lastUsedPipelineUUID)) {
+                    lastUsedIndex = postProcessingSelectComboBox.getItemCount(); // Index in filtered list
+                }
+                postProcessingSelectComboBox.addItem(item);
             }
-            postProcessingSelectComboBox.addItem(item);
         }
 
         if (lastUsedIndex != null) {
             postProcessingSelectComboBox.setSelectedIndex(lastUsedIndex);
-
         }
-
-
     }
 
     private boolean isToggleInProgress = false;
@@ -673,23 +674,21 @@ public class RecorderForm extends javax.swing.JPanel {
                 if (enablePostProcessingCheckBox.isSelected() && postProcessingSelectComboBox.getSelectedItem() != null) {
                     PostProcessingItem selectedItem = (PostProcessingItem) postProcessingSelectComboBox.getSelectedItem();
                     if (selectedItem != null && selectedItem.uuid != null) {
-                        Optional<PostProcessingData> first = configManager.getPostProcessingDataList().stream().filter(p -> p.uuid.equals(selectedItem.uuid)).findFirst();
-                        if (first.isPresent()) {
-                            PostProcessingData postProcessingData = first.get();
+                        Pipeline pipeline = configManager.getPipelineByUuid(selectedItem.uuid);
+                        if (pipeline != null) {
                             PostProcessingService ppService = new PostProcessingService(configManager);
-                            String processedText = ppService.applyPostProcessing(transcript, postProcessingData);
+                            String processedText = ppService.applyPipeline(transcript, pipeline);
                             RecorderForm.this.processedText.setText(processedText);
                             playClickSound();
                             copyTranscriptionToClipboard(processedText);
                             pasteFromClipboard();
                             updateTrayMenu();
-
+                            // Remember the last used pipeline
+                            configManager.setLastUsedPipelineUUID(pipeline.uuid);
                         } else {
-                            logger.error("Post processing data not found for UUID: " + selectedItem.uuid);
+                            logger.error("Pipeline not found for UUID: " + selectedItem.uuid);
                             updateTrayMenu();
-
                         }
-
                     }
                 } else {
                     playClickSound();

@@ -7,6 +7,10 @@ import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.whispercat.postprocessing.PostProcessingData;
+import org.whispercat.postprocessing.ProcessingUnit;
+import org.whispercat.postprocessing.Pipeline;
+import org.whispercat.postprocessing.ProcessingStepData;
+import org.whispercat.postprocessing.PipelineUnitReference;
 
 import javax.sound.sampled.AudioFormat;
 import java.io.*;
@@ -348,5 +352,353 @@ public class ConfigManager {
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
         setCustomOpenAIModels(models);
+    }
+
+    // ========== Processing Unit Management ==========
+
+    /**
+     * Saves a ProcessingUnit to the configuration.
+     * If a unit with the same UUID exists, it will be replaced.
+     *
+     * @param unit The ProcessingUnit to save
+     */
+    public void saveProcessingUnit(ProcessingUnit unit) {
+        Gson gson = new Gson();
+        String json = gson.toJson(unit);
+        JsonArray array;
+        String existing = properties.getProperty("processingUnits", "");
+        if (!existing.trim().isEmpty()) {
+            try {
+                array = JsonParser.parseString(existing).getAsJsonArray();
+            } catch (Exception e) {
+                logger.error("Existing processingUnits is not a valid JSON array, creating a new one", e);
+                array = new JsonArray();
+            }
+        } else {
+            array = new JsonArray();
+        }
+
+        // Parse the incoming JSON and extract its uuid
+        JsonElement newElement;
+        try {
+            newElement = JsonParser.parseString(json);
+        } catch (Exception e) {
+            logger.error("Failed to parse provided JSON: " + json, e);
+            return;
+        }
+
+        String newUuid;
+        try {
+            newUuid = newElement.getAsJsonObject().get("uuid").getAsString();
+        } catch (Exception e) {
+            logger.error("Provided JSON does not contain a valid 'uuid' field: " + json, e);
+            return;
+        }
+
+        boolean replaced = false;
+        // Iterate over the array to check if an element with the same uuid exists.
+        for (int i = 0; i < array.size(); i++) {
+            try {
+                JsonElement element = array.get(i);
+                String existingUuid = element.getAsJsonObject().get("uuid").getAsString();
+                if (newUuid.equals(existingUuid)) {
+                    // Replace the element with the new one.
+                    array.set(i, newElement);
+                    replaced = true;
+                    break;
+                }
+            } catch (Exception e) {
+                logger.error("Error while processing existing JSON element", e);
+            }
+        }
+
+        // If not replaced then add the new element.
+        if (!replaced) {
+            array.add(newElement);
+        }
+
+        // Save the updated JSON array to properties and call saveConfig()
+        properties.setProperty("processingUnits", gson.toJson(array));
+        saveConfig();
+    }
+
+    /**
+     * Returns the list of all processing units from the configuration.
+     *
+     * @return List of ProcessingUnit objects; empty list if none exists.
+     */
+    public List<ProcessingUnit> getProcessingUnits() {
+        Gson gson = new Gson();
+        String existing = properties.getProperty("processingUnits", "[]");
+        if (!existing.trim().isEmpty()) {
+            try {
+                ProcessingUnit[] dataArray = gson.fromJson(existing, ProcessingUnit[].class);
+                return Arrays.asList(dataArray);
+            } catch (Exception e) {
+                logger.error("Existing processingUnits is not a valid JSON array", e);
+                Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR, "Failed to load processing units");
+            }
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * Deletes a processing unit by UUID.
+     *
+     * @param uuid The UUID of the unit to delete
+     */
+    public void deleteProcessingUnit(String uuid) {
+        String existing = properties.getProperty("processingUnits", "[]");
+        if (!existing.trim().isEmpty()) {
+            Gson gson = new Gson();
+            ProcessingUnit[] dataArray = gson.fromJson(existing, ProcessingUnit[].class);
+            List<ProcessingUnit> collect = Arrays.asList(dataArray).stream()
+                    .filter(unit -> !unit.uuid.equals(uuid))
+                    .collect(Collectors.toList());
+            String json = gson.toJson(collect);
+            properties.setProperty("processingUnits", json);
+            saveConfig();
+        }
+    }
+
+    /**
+     * Gets a processing unit by UUID.
+     *
+     * @param uuid The UUID of the unit to find
+     * @return The ProcessingUnit if found, null otherwise
+     */
+    public ProcessingUnit getProcessingUnitByUuid(String uuid) {
+        List<ProcessingUnit> units = getProcessingUnits();
+        return units.stream()
+                .filter(unit -> unit.uuid.equals(uuid))
+                .findFirst()
+                .orElse(null);
+    }
+
+    // ========== Pipeline Management ==========
+
+    /**
+     * Saves a Pipeline to the configuration.
+     * If a pipeline with the same UUID exists, it will be replaced.
+     *
+     * @param pipeline The Pipeline to save
+     */
+    public void savePipeline(Pipeline pipeline) {
+        Gson gson = new Gson();
+        String json = gson.toJson(pipeline);
+        JsonArray array;
+        String existing = properties.getProperty("pipelines", "");
+        if (!existing.trim().isEmpty()) {
+            try {
+                array = JsonParser.parseString(existing).getAsJsonArray();
+            } catch (Exception e) {
+                logger.error("Existing pipelines is not a valid JSON array, creating a new one", e);
+                array = new JsonArray();
+            }
+        } else {
+            array = new JsonArray();
+        }
+
+        // Parse the incoming JSON and extract its uuid
+        JsonElement newElement;
+        try {
+            newElement = JsonParser.parseString(json);
+        } catch (Exception e) {
+            logger.error("Failed to parse provided JSON: " + json, e);
+            return;
+        }
+
+        String newUuid;
+        try {
+            newUuid = newElement.getAsJsonObject().get("uuid").getAsString();
+        } catch (Exception e) {
+            logger.error("Provided JSON does not contain a valid 'uuid' field: " + json, e);
+            return;
+        }
+
+        boolean replaced = false;
+        // Iterate over the array to check if an element with the same uuid exists.
+        for (int i = 0; i < array.size(); i++) {
+            try {
+                JsonElement element = array.get(i);
+                String existingUuid = element.getAsJsonObject().get("uuid").getAsString();
+                if (newUuid.equals(existingUuid)) {
+                    // Replace the element with the new one.
+                    array.set(i, newElement);
+                    replaced = true;
+                    break;
+                }
+            } catch (Exception e) {
+                logger.error("Error while processing existing JSON element", e);
+            }
+        }
+
+        // If not replaced then add the new element.
+        if (!replaced) {
+            array.add(newElement);
+        }
+
+        // Save the updated JSON array to properties and call saveConfig()
+        properties.setProperty("pipelines", gson.toJson(array));
+        saveConfig();
+    }
+
+    /**
+     * Returns the list of all pipelines from the configuration.
+     *
+     * @return List of Pipeline objects; empty list if none exists.
+     */
+    public List<Pipeline> getPipelines() {
+        Gson gson = new Gson();
+        String existing = properties.getProperty("pipelines", "[]");
+        if (!existing.trim().isEmpty()) {
+            try {
+                Pipeline[] dataArray = gson.fromJson(existing, Pipeline[].class);
+                return Arrays.asList(dataArray);
+            } catch (Exception e) {
+                logger.error("Existing pipelines is not a valid JSON array", e);
+                Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR, "Failed to load pipelines");
+            }
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * Deletes a pipeline by UUID.
+     *
+     * @param uuid The UUID of the pipeline to delete
+     */
+    public void deletePipeline(String uuid) {
+        String existing = properties.getProperty("pipelines", "[]");
+        if (!existing.trim().isEmpty()) {
+            Gson gson = new Gson();
+            Pipeline[] dataArray = gson.fromJson(existing, Pipeline[].class);
+            List<Pipeline> collect = Arrays.asList(dataArray).stream()
+                    .filter(pipeline -> !pipeline.uuid.equals(uuid))
+                    .collect(Collectors.toList());
+            String json = gson.toJson(collect);
+            properties.setProperty("pipelines", json);
+            saveConfig();
+        }
+    }
+
+    /**
+     * Gets a pipeline by UUID.
+     *
+     * @param uuid The UUID of the pipeline to find
+     * @return The Pipeline if found, null otherwise
+     */
+    public Pipeline getPipelineByUuid(String uuid) {
+        List<Pipeline> pipelines = getPipelines();
+        return pipelines.stream()
+                .filter(pipeline -> pipeline.uuid.equals(uuid))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Gets the UUID of the last used pipeline.
+     *
+     * @return The last used pipeline UUID or empty string
+     */
+    public String getLastUsedPipelineUUID() {
+        return properties.getProperty("lastUsedPipelineUUID", "");
+    }
+
+    /**
+     * Sets the UUID of the last used pipeline.
+     *
+     * @param uuid The pipeline UUID to remember
+     */
+    public void setLastUsedPipelineUUID(String uuid) {
+        properties.setProperty("lastUsedPipelineUUID", uuid);
+        saveConfig();
+    }
+
+    // ========== Data Migration ==========
+
+    /**
+     * Migrates old PostProcessingData to the new Pipeline + ProcessingUnit architecture.
+     * This should be called once on application startup.
+     */
+    public void migrateOldPostProcessingData() {
+        // Check if migration has already been done
+        String migrated = properties.getProperty("postProcessingMigrated", "false");
+        if ("true".equals(migrated)) {
+            logger.info("Post-processing data already migrated");
+            return;
+        }
+
+        logger.info("Starting post-processing data migration...");
+
+        // Get old post-processing data
+        List<PostProcessingData> oldData = getPostProcessingDataList();
+        if (oldData.isEmpty()) {
+            logger.info("No old post-processing data to migrate");
+            properties.setProperty("postProcessingMigrated", "true");
+            saveConfig();
+            return;
+        }
+
+        logger.info("Migrating {} old post-processing configurations", oldData.size());
+
+        // Migrate each old PostProcessingData to a new Pipeline
+        for (PostProcessingData data : oldData) {
+            try {
+                // Create a new pipeline for this configuration
+                Pipeline pipeline = new Pipeline();
+                pipeline.uuid = data.uuid != null ? data.uuid : java.util.UUID.randomUUID().toString();
+                pipeline.title = data.title != null ? data.title : "Migrated Pipeline";
+                pipeline.description = data.description != null ? data.description : "Migrated from old post-processing";
+                pipeline.enabled = true;
+
+                // Convert each step to a ProcessingUnit and add to pipeline
+                if (data.steps != null) {
+                    for (int i = 0; i < data.steps.size(); i++) {
+                        ProcessingStepData step = data.steps.get(i);
+
+                        // Create a ProcessingUnit from the step
+                        ProcessingUnit unit = new ProcessingUnit();
+                        unit.uuid = java.util.UUID.randomUUID().toString();
+                        unit.name = data.title + " - Step " + (i + 1);
+                        unit.description = "Migrated from " + data.title;
+                        unit.type = step.type;
+
+                        // Copy fields based on type
+                        if ("Prompt".equalsIgnoreCase(step.type)) {
+                            unit.provider = step.provider;
+                            unit.model = step.model;
+                            unit.systemPrompt = step.systemPrompt;
+                            unit.userPrompt = step.userPrompt;
+                        } else if ("Text Replacement".equalsIgnoreCase(step.type)) {
+                            unit.textToReplace = step.textToReplace;
+                            unit.replacementText = step.replacementText;
+                        }
+
+                        // Save the unit to the library
+                        saveProcessingUnit(unit);
+
+                        // Add a reference to this unit in the pipeline
+                        PipelineUnitReference ref = new PipelineUnitReference();
+                        ref.unitUuid = unit.uuid;
+                        ref.enabled = step.enabled;
+                        pipeline.unitReferences.add(ref);
+                    }
+                }
+
+                // Save the pipeline
+                savePipeline(pipeline);
+                logger.info("Migrated pipeline: {}", pipeline.title);
+
+            } catch (Exception e) {
+                logger.error("Error migrating post-processing data: " + data.title, e);
+            }
+        }
+
+        // Mark migration as complete
+        properties.setProperty("postProcessingMigrated", "true");
+        saveConfig();
+
+        logger.info("Post-processing data migration completed successfully");
     }
 }
