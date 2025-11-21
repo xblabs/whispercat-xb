@@ -8,6 +8,8 @@ import org.whispercat.postprocessing.clients.OpenWebUIProcessClient;
 import org.whispercat.recording.OpenAIClient;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class PostProcessingService {
 
@@ -148,6 +150,7 @@ public class PostProcessingService {
 
     /**
      * Executes a pipeline by resolving unit references and applying enabled units in sequence.
+     * Automatically optimizes consecutive units with the same provider/model into single API calls.
      *
      * @param originalText The initial transcribed text.
      * @param pipeline     The pipeline configuration to execute.
@@ -162,56 +165,38 @@ public class PostProcessingService {
             return originalText;
         }
 
-        String processedText = originalText;
-        int enabledUnitCount = 0;
-        int currentUnit = 0;
+        // Group units into batches for optimization
+        List<UnitBatch> batches = groupUnitsIntoBatches(pipeline);
 
-        // Count enabled units
-        for (PipelineUnitReference ref : pipeline.unitReferences) {
-            if (ref.enabled) {
-                enabledUnitCount++;
-            }
+        // Count total enabled units
+        int enabledUnitCount = 0;
+        for (UnitBatch batch : batches) {
+            enabledUnitCount += batch.units.size();
         }
 
         // Log pipeline start
         console.separator();
         console.log("Starting pipeline: " + pipeline.title);
         console.log("Enabled units: " + enabledUnitCount);
+
+        // Log optimization summary
+        int optimizedCount = 0;
+        for (UnitBatch batch : batches) {
+            if (batch.isOptimizable) {
+                optimizedCount += batch.units.size();
+            }
+        }
+        if (optimizedCount > 0) {
+            int savedCalls = optimizedCount - (int) batches.stream().filter(b -> b.isOptimizable).count();
+            console.log("⚡ Optimization: " + savedCalls + " API call(s) saved by chaining");
+        }
         console.separator();
 
-        // Iterate over unit references
-        for (PipelineUnitReference ref : pipeline.unitReferences) {
-            // Skip disabled units
-            if (!ref.enabled) {
-                logger.info("Skipping disabled unit reference in pipeline: {}", ref.unitUuid);
-                console.log("Skipping disabled unit: " + ref.unitUuid);
-                continue;
-            }
-
-            // Resolve the unit from the library
-            ProcessingUnit unit = configManager.getProcessingUnitByUuid(ref.unitUuid);
-            if (unit == null) {
-                logger.warn("Unit with UUID {} not found, skipping", ref.unitUuid);
-                console.logError("Unit not found: " + ref.unitUuid);
-                continue;
-            }
-
-            currentUnit++;
-
-            // Log unit start
-            console.logStep(unit.name + " (" + unit.type + ")", currentUnit, enabledUnitCount);
-
-            // Process based on unit type
-            if ("Prompt".equalsIgnoreCase(unit.type)) {
-                processedText = performPromptProcessingWithUnit(processedText, unit, currentUnit, enabledUnitCount);
-            } else if ("Text Replacement".equalsIgnoreCase(unit.type)) {
-                console.log("  Replacing: '" + unit.textToReplace + "' → '" + unit.replacementText + "'");
-                processedText = processedText.replace(unit.textToReplace, unit.replacementText);
-                console.logSuccess("Text replacement completed");
-            } else {
-                logger.warn("Unknown unit type: {}", unit.type);
-                console.logError("Unknown unit type: " + unit.type);
-            }
+        // Execute each batch
+        String processedText = originalText;
+        for (int i = 0; i < batches.size(); i++) {
+            UnitBatch batch = batches.get(i);
+            processedText = executeBatch(processedText, batch, i + 1, batches.size());
         }
 
         // Log pipeline completion
@@ -283,5 +268,210 @@ public class PostProcessingService {
             console.logError("API call failed: " + e.getMessage());
         }
         return inputText;
+    }
+
+    /**
+     * Inner class representing a batch of units that can be optimized into a single API call.
+     */
+    private static class UnitBatch {
+        List<ProcessingUnit> units = new ArrayList<>();
+        boolean isOptimizable = false; // true if 2+ prompt units with same provider/model
+        String provider;
+        String model;
+
+        boolean canAddUnit(ProcessingUnit unit) {
+            if (!"Prompt".equalsIgnoreCase(unit.type)) {
+                return false; // Text replacement breaks the chain
+            }
+            if (units.isEmpty()) {
+                return true; // First unit in batch
+            }
+            // Check if same provider and model
+            return provider.equals(unit.provider) && model.equals(unit.model);
+        }
+
+        void addUnit(ProcessingUnit unit) {
+            units.add(unit);
+            if (units.size() == 1) {
+                provider = unit.provider;
+                model = unit.model;
+            }
+            if (units.size() >= 2) {
+                isOptimizable = true;
+            }
+        }
+    }
+
+    /**
+     * Groups consecutive units with the same provider/model into batches for optimization.
+     * Text Replacement units break the chain.
+     *
+     * @param pipeline The pipeline to analyze
+     * @return List of batches, each batch contains 1+ units
+     */
+    private List<UnitBatch> groupUnitsIntoBatches(Pipeline pipeline) {
+        List<UnitBatch> batches = new ArrayList<>();
+        UnitBatch currentBatch = null;
+
+        for (PipelineUnitReference ref : pipeline.unitReferences) {
+            if (!ref.enabled) {
+                continue; // Skip disabled units
+            }
+
+            ProcessingUnit unit = configManager.getProcessingUnitByUuid(ref.unitUuid);
+            if (unit == null) {
+                continue; // Skip missing units
+            }
+
+            // Check if we can add to current batch
+            if (currentBatch != null && currentBatch.canAddUnit(unit)) {
+                currentBatch.addUnit(unit);
+            } else {
+                // Start new batch
+                if (currentBatch != null) {
+                    batches.add(currentBatch);
+                }
+                currentBatch = new UnitBatch();
+                currentBatch.addUnit(unit);
+            }
+        }
+
+        // Add final batch
+        if (currentBatch != null && !currentBatch.units.isEmpty()) {
+            batches.add(currentBatch);
+        }
+
+        return batches;
+    }
+
+    /**
+     * Compiles a chained prompt for multiple units using Style 1 (explicit variable naming).
+     * This creates a single prompt that executes all units in sequence with clear data flow.
+     *
+     * @param inputText The initial input text
+     * @param batch The batch of units to chain
+     * @return Array: [systemPrompt, userPrompt]
+     */
+    private String[] compileChainedPrompt(String inputText, UnitBatch batch) {
+        StringBuilder systemPrompt = new StringBuilder();
+        StringBuilder userPrompt = new StringBuilder();
+
+        // System prompt: explain the chaining and list step contexts
+        systemPrompt.append("Execute transformations sequentially. Each step's output becomes the next step's input.\n\n");
+        systemPrompt.append("Step Contexts:\n");
+
+        for (int i = 0; i < batch.units.size(); i++) {
+            ProcessingUnit unit = batch.units.get(i);
+            systemPrompt.append((i + 1)).append(". ");
+            if (unit.systemPrompt != null && !unit.systemPrompt.trim().isEmpty()) {
+                systemPrompt.append(unit.systemPrompt);
+            } else {
+                systemPrompt.append("No specific context");
+            }
+            systemPrompt.append("\n");
+        }
+
+        // User prompt: define INPUT_TEXT and each STEP
+        userPrompt.append("INPUT_TEXT:\n\"\"\"\n").append(inputText).append("\n\"\"\"\n\n");
+
+        for (int i = 0; i < batch.units.size(); i++) {
+            ProcessingUnit unit = batch.units.get(i);
+            String instruction = unit.userPrompt;
+
+            // Replace {{input}} with the appropriate variable
+            if (i == 0) {
+                // First step uses INPUT_TEXT
+                instruction = instruction.replaceAll("\\{\\{input}}", "INPUT_TEXT");
+            } else {
+                // Subsequent steps use previous step's output
+                instruction = instruction.replaceAll("\\{\\{input}}", "STEP" + i + "_OUTPUT");
+            }
+
+            userPrompt.append("STEP_").append(i + 1).append(": ").append(instruction)
+                    .append("\n→ Store result as: STEP").append(i + 1).append("_OUTPUT\n\n");
+        }
+
+        // Final instruction
+        userPrompt.append("Return only: STEP").append(batch.units.size()).append("_OUTPUT");
+
+        return new String[]{systemPrompt.toString(), userPrompt.toString()};
+    }
+
+    /**
+     * Executes a batch of units. If optimizable (2+ units with same model), compiles a chained prompt.
+     * Otherwise executes units individually.
+     *
+     * @param inputText The input text for this batch
+     * @param batch The batch to execute
+     * @param batchNumber Current batch number for logging
+     * @param totalBatches Total number of batches
+     * @return The output text after processing this batch
+     */
+    private String executeBatch(String inputText, UnitBatch batch, int batchNumber, int totalBatches) {
+        ConsoleLogger console = ConsoleLogger.getInstance();
+
+        if (batch.isOptimizable) {
+            // Optimized: execute as single API call with chained prompt
+            console.log("⚡ Optimizing " + batch.units.size() + " consecutive " + batch.provider + " calls into 1");
+            console.separator();
+
+            // Log each unit that's being merged
+            for (int i = 0; i < batch.units.size(); i++) {
+                ProcessingUnit unit = batch.units.get(i);
+                console.log("  Fragment " + (i + 1) + "/" + batch.units.size() + ": " + unit.name);
+            }
+
+            // Compile the chained prompt
+            String[] prompts = compileChainedPrompt(inputText, batch);
+            String systemPrompt = prompts[0];
+            String userPrompt = prompts[1];
+
+            // Log the compiled prompts
+            console.log("");
+            console.logPrompt("  Compiled System Prompt", systemPrompt);
+            console.logPrompt("  Compiled User Prompt", userPrompt);
+            console.log("");
+            console.log("  Provider: " + batch.provider + " | Model: " + batch.model);
+            console.log("  Calling " + batch.provider + " API with chained prompt...");
+
+            try {
+                String result;
+                if (batch.provider.equalsIgnoreCase("OpenAI")) {
+                    result = openAIClient.processText(systemPrompt, userPrompt, batch.model);
+                } else if (batch.provider.equalsIgnoreCase("Open WebUI")) {
+                    result = openWebUIClient.processText(systemPrompt, userPrompt, batch.model);
+                } else {
+                    console.logError("Unknown provider: " + batch.provider);
+                    return inputText;
+                }
+                console.logSuccess("Chained API call completed");
+                console.separator();
+                return result;
+            } catch (IOException e) {
+                logger.error("Error executing chained prompt", e);
+                console.logError("Chained API call failed: " + e.getMessage());
+                console.separator();
+                return inputText;
+            }
+
+        } else {
+            // Not optimizable: execute units individually
+            String processedText = inputText;
+            for (int i = 0; i < batch.units.size(); i++) {
+                ProcessingUnit unit = batch.units.get(i);
+
+                // Log unit start
+                console.logStep(unit.name + " (" + unit.type + ")", batchNumber, totalBatches);
+
+                if ("Prompt".equalsIgnoreCase(unit.type)) {
+                    processedText = performPromptProcessingWithUnit(processedText, unit, batchNumber, totalBatches);
+                } else if ("Text Replacement".equalsIgnoreCase(unit.type)) {
+                    console.log("  Replacing: '" + unit.textToReplace + "' → '" + unit.replacementText + "'");
+                    processedText = processedText.replace(unit.textToReplace, unit.replacementText);
+                    console.logSuccess("Text replacement completed");
+                }
+            }
+            return processedText;
+        }
     }
 }
