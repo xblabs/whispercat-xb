@@ -34,9 +34,9 @@ import java.util.Optional;
 public class RecorderForm extends javax.swing.JPanel {
 
     private final JTextArea processedText = new JTextArea(3, 20);
-    private final JCheckBox enablePostProcessingCheckBox = new JCheckBox("<html>Enable Post Processing&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</html>");
+    private final JCheckBox enablePostProcessingCheckBox = new JCheckBox("Enable Post Processing");
     private final JButton recordButton;
-    private final int baseIconSize = 200;
+    private final int baseIconSize = 40;  // Reduced from 200 for status indicator
     private final OpenAITranscribeClient whisperClient;
     private final ConfigManager configManager;
     private final FasterWhisperTranscribeClient fasterWhisperTranscribeClient;
@@ -44,7 +44,7 @@ public class RecorderForm extends javax.swing.JPanel {
     private boolean isRecording = false;
     private AudioRecorder recorder;
     private final JTextArea transcriptionTextArea;
-    private final JLabel recordingLabel;
+    private final JPanel statusIndicatorPanel;  // Status circles instead of large logo
     private JButton copyButton;
 
     private static final org.apache.logging.log4j.Logger logger = org.apache.logging.log4j.LogManager.getLogger(RecorderForm.class);
@@ -63,28 +63,43 @@ public class RecorderForm extends javax.swing.JPanel {
 
         JPanel centerPanel = new JPanel();
         centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
-        centerPanel.setBorder(new EmptyBorder(50, 50, 10, 50));
+        centerPanel.setBorder(new EmptyBorder(30, 50, 10, 50));
 
-        int iconSize = UIScale.scale(baseIconSize);
-        FlatSVGIcon micIcon = new FlatSVGIcon("whispercat.svg", iconSize, iconSize);
-        recordingLabel = new JLabel(micIcon);
-        recordingLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        recordingLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        recordingLabel.addMouseListener(new MouseAdapter() {
+        // Create status indicator panel (small circles next to button)
+        statusIndicatorPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
+        statusIndicatorPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Status indicator (small circle that changes color)
+        JPanel statusCircle = new JPanel() {
             @Override
-            public void mouseClicked(MouseEvent e) {
-                toggleRecording();
-            }
-        });
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        JLabel recordingStatusLabel = new JLabel("Recording status:");
-        recordingStatusLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+                // Default: green (ready)
+                g2.setColor(new Color(144, 238, 144)); // Light green
+                if (isRecording) {
+                    g2.setColor(new Color(255, 99, 71)); // Tomato red when recording
+                }
+                g2.fillOval(2, 2, 16, 16);
+
+                // Border
+                g2.setColor(Color.DARK_GRAY);
+                g2.drawOval(2, 2, 16, 16);
+                g2.dispose();
+            }
+        };
+        statusCircle.setPreferredSize(new Dimension(20, 20));
+        statusCircle.setOpaque(false);
 
         recordButton = new JButton("Start Recording");
-        recordButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         recordButton.addActionListener(e -> {
             toggleRecording();
         });
+
+        statusIndicatorPanel.add(statusCircle);
+        statusIndicatorPanel.add(recordButton);
 
         JPanel transcriptionPanel = new JPanel();
         transcriptionPanel.setLayout(new BoxLayout(transcriptionPanel, BoxLayout.Y_AXIS));
@@ -105,20 +120,21 @@ public class RecorderForm extends javax.swing.JPanel {
         copyButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         copyButton.addActionListener(e -> copyTranscriptionToClipboard(transcriptionTextArea.getText()));
 
-        centerPanel.add(recordingLabel);
+        // Add components to center panel with proper spacing
         centerPanel.add(Box.createVerticalStrut(10));
-        centerPanel.add(recordButton);
-        centerPanel.add(Box.createVerticalStrut(10));
+        centerPanel.add(statusIndicatorPanel);  // Status indicator + record button
+        centerPanel.add(Box.createVerticalStrut(20));  // Section spacing
         centerPanel.add(transcriptionPanel);
         centerPanel.add(Box.createVerticalStrut(10));
         centerPanel.add(copyButton);
+        centerPanel.add(Box.createVerticalStrut(15));
+
+        // Drag & drop hint
         JLabel dragDropLabel = new JLabel("Drag & drop an audio file here.");
         dragDropLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         dragDropLabel.setForeground(Color.GRAY);
-        centerPanel.add(Box.createVerticalStrut(10));
         centerPanel.add(dragDropLabel);
-        centerPanel.add(Box.createVerticalStrut(10));
-        centerPanel.add(Box.createVerticalStrut(10));
+        centerPanel.add(Box.createVerticalStrut(20));  // Section spacing
         centerPanel.add(Box.createVerticalGlue());
 
         centerPanel.setTransferHandler(new TransferHandler() {
@@ -170,7 +186,7 @@ public class RecorderForm extends javax.swing.JPanel {
             configManager.setAutoPasteEnabled(autoPasteCheckBox.isSelected());
         });
 
-        enablePostProcessingCheckBox.setHorizontalTextPosition(SwingConstants.LEFT);
+        // enablePostProcessingCheckBox uses default alignment (text on right)
 
         JCheckBox loadOnStartupCheckBox = new JCheckBox("Activate on startup");
         loadOnStartupCheckBox.setVisible(false); // initially hidden
@@ -303,7 +319,9 @@ public class RecorderForm extends javax.swing.JPanel {
                 layout.createSequentialGroup()
                         .addContainerGap()
                         .addComponent(centerPanel)
+                        .addGap(20)  // Spacing between sections
                         .addComponent(postProcessingContainerPanel)
+                        .addGap(20)  // Spacing between sections
                         .addComponent(consolePanel, 150, 150, 150)
                         .addContainerGap(20, Short.MAX_VALUE)
         );
@@ -570,14 +588,13 @@ public class RecorderForm extends javax.swing.JPanel {
         transcriptionTextArea.setFocusable(false);
         transcriptionTextArea.setFocusable(true);
 
-        int iconSize = UIScale.scale(baseIconSize);
-        recordingLabel.setIcon(new FlatSVGIcon("antenna.svg", iconSize, iconSize));
+        // Repaint status indicator to show recording state (red circle)
+        statusIndicatorPanel.repaint();
 
         SwingWorker<Void, Void> worker = new SwingWorker<>() {
             @Override
             protected Void doInBackground() throws Exception {
                 isToggleInProgress = true;
-                recordingLabel.setEnabled(false);
                 recordButton.setEnabled(false);
                 Thread.sleep(1000);
                 return null;
@@ -586,7 +603,6 @@ public class RecorderForm extends javax.swing.JPanel {
             @Override
             protected void done() {
                 isToggleInProgress = false;
-                recordingLabel.setEnabled(true);
                 recordButton.setEnabled(true);
                 recordButton.setText("Stop Recording");
             }
@@ -595,10 +611,8 @@ public class RecorderForm extends javax.swing.JPanel {
     }
 
     private void updateUIForRecordingStop() {
-        int iconSize = UIScale.scale(baseIconSize);
-        FlatSVGIcon svgIcon = new FlatSVGIcon("hourglas.svg", iconSize, iconSize);
-        recordingLabel.setIcon(svgIcon);
-        recordingLabel.setEnabled(false);
+        // Repaint status indicator
+        statusIndicatorPanel.repaint();
 
         recordButton.setText("Converting. Please wait...");
         recordButton.setEnabled(false);
@@ -606,10 +620,10 @@ public class RecorderForm extends javax.swing.JPanel {
 
     private void resetUIAfterTranscription() {
         isStoppingInProgress = false;
-        int iconSize = UIScale.scale(baseIconSize);
-        FlatSVGIcon svgIcon = new FlatSVGIcon("microphone.svg", iconSize, iconSize);
-        recordingLabel.setIcon(svgIcon);
-        recordingLabel.setEnabled(true);
+
+        // Repaint status indicator to show ready state (green circle)
+        statusIndicatorPanel.repaint();
+
         recordButton.setText("Start Recording");
         recordButton.setEnabled(true);
     }
