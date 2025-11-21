@@ -1,6 +1,7 @@
 package org.whispercat.postprocessing;
 
 import org.whispercat.ConfigManager;
+import org.whispercat.ConsoleLogger;
 import org.whispercat.Notificationmanager;
 import org.whispercat.ToastNotification;
 import org.whispercat.postprocessing.clients.OpenWebUIProcessClient;
@@ -153,8 +154,11 @@ public class PostProcessingService {
      * @return The processed text after all enabled units.
      */
     public String applyPipeline(String originalText, Pipeline pipeline) {
+        ConsoleLogger console = ConsoleLogger.getInstance();
+
         if (!pipeline.enabled) {
             logger.info("Pipeline '{}' is disabled, skipping execution", pipeline.title);
+            console.log("Pipeline '" + pipeline.title + "' is disabled, skipping");
             return originalText;
         }
 
@@ -169,17 +173,18 @@ public class PostProcessingService {
             }
         }
 
-        // Show initial notification
-        if (enabledUnitCount > 0) {
-            Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
-                    "Starting pipeline '" + pipeline.title + "' (" + enabledUnitCount + " units)...");
-        }
+        // Log pipeline start
+        console.separator();
+        console.log("Starting pipeline: " + pipeline.title);
+        console.log("Enabled units: " + enabledUnitCount);
+        console.separator();
 
         // Iterate over unit references
         for (PipelineUnitReference ref : pipeline.unitReferences) {
             // Skip disabled units
             if (!ref.enabled) {
                 logger.info("Skipping disabled unit reference in pipeline: {}", ref.unitUuid);
+                console.log("Skipping disabled unit: " + ref.unitUuid);
                 continue;
             }
 
@@ -187,33 +192,32 @@ public class PostProcessingService {
             ProcessingUnit unit = configManager.getProcessingUnitByUuid(ref.unitUuid);
             if (unit == null) {
                 logger.warn("Unit with UUID {} not found, skipping", ref.unitUuid);
-                Notificationmanager.getInstance().showNotification(ToastNotification.Type.WARNING,
-                        "Unit not found: " + ref.unitUuid);
+                console.logError("Unit not found: " + ref.unitUuid);
                 continue;
             }
 
             currentUnit++;
-            String unitDescription = getUnitDescription(unit, currentUnit, enabledUnitCount);
 
-            // Show notification for current unit
-            Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
-                    unitDescription);
+            // Log unit start
+            console.logStep(unit.name + " (" + unit.type + ")", currentUnit, enabledUnitCount);
 
             // Process based on unit type
             if ("Prompt".equalsIgnoreCase(unit.type)) {
-                processedText = performPromptProcessingWithUnit(processedText, unit);
+                processedText = performPromptProcessingWithUnit(processedText, unit, currentUnit, enabledUnitCount);
             } else if ("Text Replacement".equalsIgnoreCase(unit.type)) {
+                console.log("  Replacing: '" + unit.textToReplace + "' → '" + unit.replacementText + "'");
                 processedText = processedText.replace(unit.textToReplace, unit.replacementText);
+                console.logSuccess("Text replacement completed");
             } else {
                 logger.warn("Unknown unit type: {}", unit.type);
+                console.logError("Unknown unit type: " + unit.type);
             }
         }
 
-        // Show completion notification
-        if (enabledUnitCount > 0) {
-            Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
-                    "Pipeline completed!");
-        }
+        // Log pipeline completion
+        console.separator();
+        console.logSuccess("Pipeline completed: " + pipeline.title);
+        console.separator();
 
         return processedText;
     }
@@ -244,30 +248,39 @@ public class PostProcessingService {
      *
      * @param inputText The input text to process.
      * @param unit      The processing unit configuration.
+     * @param currentUnit Current unit number.
+     * @param enabledUnitCount Total enabled units.
      * @return The processed text from the API response.
      */
-    private String performPromptProcessingWithUnit(String inputText, ProcessingUnit unit) {
+    private String performPromptProcessingWithUnit(String inputText, ProcessingUnit unit, int currentUnit, int enabledUnitCount) {
+        ConsoleLogger console = ConsoleLogger.getInstance();
         logger.info("Pre-processing input with unit: {}", unit.name);
-        logger.info("Transcript: {}", inputText);
 
         // Combine the user prompt with the input text.
         String fullUserPrompt = unit.userPrompt.replaceAll("\\{\\{input}}", inputText);
-        logger.info("Post-processing input: {}", fullUserPrompt);
+
+        // Log prompts to console
+        console.log("  Provider: " + unit.provider + " | Model: " + unit.model);
+        if (unit.systemPrompt != null && !unit.systemPrompt.trim().isEmpty()) {
+            console.logPrompt("  System Prompt", unit.systemPrompt);
+        }
+        console.logPrompt("  User Prompt", fullUserPrompt);
 
         try {
             if (unit.provider.equalsIgnoreCase("OpenAI")) {
-                logger.info("Processing using OpenAI API.");
+                console.log("  Calling OpenAI API...");
                 String result = openAIClient.processText(unit.systemPrompt, fullUserPrompt, unit.model);
+                console.logSuccess("API call completed");
                 return result;
             } else if (unit.provider.equalsIgnoreCase("Open WebUI")) {
-                logger.info("Processing using Open WebUI.");
+                console.log("  Calling Open WebUI...");
                 String result = openWebUIClient.processText(unit.systemPrompt, fullUserPrompt, unit.model);
+                console.logSuccess("API call completed");
                 return result;
             }
         } catch (IOException e) {
             logger.error("Error processing with unit: {}", unit.name, e);
-            Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
-                    "Error processing unit: " + unit.name);
+            console.logError("API call failed: " + e.getMessage());
         }
         return inputText;
     }

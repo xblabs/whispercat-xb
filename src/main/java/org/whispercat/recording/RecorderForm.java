@@ -52,6 +52,7 @@ public class RecorderForm extends javax.swing.JPanel {
 
     private JComboBox<PostProcessingItem> postProcessingSelectComboBox;
     private List<Pipeline> pipelineList;
+    private JTextArea consoleLogArea;
 
     public RecorderForm(ConfigManager configManager) {
         this.configManager = configManager;
@@ -270,6 +271,21 @@ public class RecorderForm extends javax.swing.JPanel {
             enablePostProcessingCheckBox.doClick();
         }
 
+        // Console log panel
+        JPanel consolePanel = new JPanel(new BorderLayout());
+        consolePanel.setBorder(BorderFactory.createTitledBorder("Execution Log"));
+        consoleLogArea = new JTextArea(8, 20);
+        consoleLogArea.setEditable(false);
+        consoleLogArea.setLineWrap(true);
+        consoleLogArea.setWrapStyleWord(true);
+        consoleLogArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 11));
+        JScrollPane consoleScrollPane = new JScrollPane(consoleLogArea);
+        consoleScrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+        consolePanel.add(consoleScrollPane, BorderLayout.CENTER);
+
+        // Register console with ConsoleLogger singleton
+        ConsoleLogger.getInstance().setConsoleArea(consoleLogArea);
+
         checkSettings();
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
@@ -279,6 +295,7 @@ public class RecorderForm extends javax.swing.JPanel {
                 layout.createParallelGroup(javax.swing.GroupLayout.Alignment.CENTER)
                         .addComponent(centerPanel)
                         .addComponent(postProcessingContainerPanel)
+                        .addComponent(consolePanel)
         );
 
         layout.setVerticalGroup(
@@ -286,7 +303,8 @@ public class RecorderForm extends javax.swing.JPanel {
                         .addContainerGap()
                         .addComponent(centerPanel)
                         .addComponent(postProcessingContainerPanel)
-                        .addContainerGap(237, Short.MAX_VALUE)
+                        .addComponent(consolePanel, 150, 150, 150)
+                        .addContainerGap(20, Short.MAX_VALUE)
         );
 
         // Enable drag & drop for audio files
@@ -628,24 +646,32 @@ public class RecorderForm extends javax.swing.JPanel {
 
         @Override
         protected String doInBackground() {
+            ConsoleLogger console = ConsoleLogger.getInstance();
             try {
-                if (configManager.getWhisperServer().equals("OpenAI")) {
+                String server = configManager.getWhisperServer();
+                console.separator();
+                console.log("Starting transcription using " + server);
+                console.log("Audio file: " + audioFile.getName());
+
+                if (server.equals("OpenAI")) {
                     logger.info("Transcribing audio using OpenAI");
                     return whisperClient.transcribe(audioFile);
-                } else if (configManager.getWhisperServer().equals("Faster-Whisper")) {
+                } else if (server.equals("Faster-Whisper")) {
                     logger.info("Transcribing audio using Faster-Whisper");
                     return fasterWhisperTranscribeClient.transcribe(audioFile);
-                } else if (configManager.getWhisperServer().equals("Open WebUI")) {
+                } else if (server.equals("Open WebUI")) {
                     logger.info("Transcribing audio using Open WebUI");
                     return openWebUITranscribeClient.transcribeAudio(audioFile);
                 } else {
-                    logger.error("Unknown Whisper server: " + configManager.getWhisperServer());
+                    logger.error("Unknown Whisper server: " + server);
+                    console.logError("Unknown Whisper server: " + server);
                     Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
-                            "Unknown Whisper server: " + configManager.getWhisperServer());
+                            "Unknown Whisper server: " + server);
                     return null;
                 }
             } catch (Exception e) {
                 logger.error("Error during transcription", e);
+                ConsoleLogger.getInstance().logError("Transcription failed: " + e.getMessage());
                 Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
                         "Error during transcription. See logs.");
                 return null;
@@ -654,20 +680,25 @@ public class RecorderForm extends javax.swing.JPanel {
 
         @Override
         protected void done() {
+            ConsoleLogger console = ConsoleLogger.getInstance();
             String transcript = null;
             try {
                 transcript = get();
                 if (transcript != null) {
                     logger.info("Transcribed text: " + transcript);
                     transcriptionTextArea.setText(transcript);
+                    console.logSuccess("Transcription completed");
+                    console.log("Transcript length: " + transcript.length() + " characters");
                     // Show success notification
                     Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
-                            "Transcription completed successfully!");
+                            "Transcription completed!");
                 } else {
                     logger.warn("Transcription resulted in null");
+                    console.logError("Transcription returned null");
                 }
             } catch (Exception e) {
                 logger.error("An error occurred while finishing the transcription", e);
+                console.logError("Error finishing transcription: " + e.getMessage());
             } finally {
                 resetUIAfterTranscription();
                 isRecording = false;
@@ -679,6 +710,9 @@ public class RecorderForm extends javax.swing.JPanel {
                             PostProcessingService ppService = new PostProcessingService(configManager);
                             String processedText = ppService.applyPipeline(transcript, pipeline);
                             RecorderForm.this.processedText.setText(processedText);
+                            // Show pipeline completion toast
+                            Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
+                                    "Post-processing completed!");
                             playClickSound();
                             copyTranscriptionToClipboard(processedText);
                             pasteFromClipboard();
@@ -687,6 +721,7 @@ public class RecorderForm extends javax.swing.JPanel {
                             configManager.setLastUsedPipelineUUID(pipeline.uuid);
                         } else {
                             logger.error("Pipeline not found for UUID: " + selectedItem.uuid);
+                            console.logError("Pipeline not found: " + selectedItem.uuid);
                             updateTrayMenu();
                         }
                     }
