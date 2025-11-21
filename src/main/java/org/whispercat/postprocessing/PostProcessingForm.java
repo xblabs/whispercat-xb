@@ -317,7 +317,7 @@ public class PostProcessingForm extends JPanel {
             JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
 
             // Up button
-            JButton upButton = new JButton("↑");
+            JButton upButton = new JButton("Up");
             upButton.setToolTipText("Move this step up");
             upButton.setMargin(new Insets(2, 6, 2, 6));
             upButton.addActionListener((ActionEvent e) -> {
@@ -332,7 +332,7 @@ public class PostProcessingForm extends JPanel {
             });
 
             // Down button
-            JButton downButton = new JButton("↓");
+            JButton downButton = new JButton("Down");
             downButton.setToolTipText("Move this step down");
             downButton.setMargin(new Insets(2, 6, 2, 6));
             downButton.addActionListener((ActionEvent e) -> {

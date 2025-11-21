@@ -319,7 +319,7 @@ public class PipelineEditorForm extends JPanel {
             buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
 
             // Up button
-            JButton upButton = new JButton("↑");
+            JButton upButton = new JButton("Up");
             upButton.setToolTipText("Move this unit up");
             upButton.setMargin(new Insets(2, 6, 2, 6));
             upButton.addActionListener((ActionEvent e) -> {
@@ -334,7 +334,7 @@ public class PipelineEditorForm extends JPanel {
             });
 
             // Down button
-            JButton downButton = new JButton("↓");
+            JButton downButton = new JButton("Down");
             downButton.setToolTipText("Move this unit down");
             downButton.setMargin(new Insets(2, 6, 2, 6));
             downButton.addActionListener((ActionEvent e) -> {
