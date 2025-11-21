@@ -109,7 +109,14 @@ public class PipelineEditorForm extends JPanel {
         bottomPanel.add(doneButton);
         bottomPanel.add(Box.createHorizontalStrut(10));
 
-        JButton addUnitButton = new JButton("Add Unit");
+        JButton createUnitButton = new JButton("Create New Unit");
+        createUnitButton.setToolTipText("Create a new unit and add it to this pipeline");
+        createUnitButton.addActionListener(e -> showCreateUnitDialog());
+        bottomPanel.add(createUnitButton);
+        bottomPanel.add(Box.createHorizontalStrut(10));
+
+        JButton addUnitButton = new JButton("Add Existing Unit");
+        addUnitButton.setToolTipText("Add a unit from the library");
         addUnitButton.addActionListener(e -> showAddUnitDialog());
         bottomPanel.add(addUnitButton);
 
@@ -140,10 +147,74 @@ public class PipelineEditorForm extends JPanel {
         }
     }
 
+    private void showCreateUnitDialog() {
+        // Create a dialog for unit creation
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Create New Unit", true);
+        dialog.setLayout(new BorderLayout());
+
+        // Create a custom unit editor form with a callback
+        JPanel editorPanel = createInlineUnitEditor(dialog);
+
+        dialog.add(editorPanel, BorderLayout.CENTER);
+        dialog.setSize(700, 600);
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+    }
+
+    private JPanel createInlineUnitEditor(JDialog parentDialog) {
+        // Create a simplified unit editor that saves and adds to pipeline
+        UnitEditorForm editorForm = new UnitEditorForm(configManager, mainForm, null) {
+            @Override
+            protected void saveAndReturn() {
+                if (!validateData()) {
+                    return;
+                }
+
+                ProcessingUnit unit = new ProcessingUnit();
+
+                // Generate UUID for new unit
+                String newUuid = java.util.UUID.randomUUID().toString();
+                unit.uuid = newUuid;
+
+                unit.name = getNameFieldText();
+                unit.description = getDescriptionFieldText();
+                unit.type = getTypeComboSelection();
+
+                if ("Prompt".equals(unit.type)) {
+                    unit.provider = getProviderComboSelection();
+                    unit.model = getModelComboSelection();
+                    unit.systemPrompt = getSystemPromptText();
+                    unit.userPrompt = getUserPromptText();
+                } else if ("Text Replacement".equals(unit.type)) {
+                    unit.textToReplace = getTextToReplaceFieldText();
+                    unit.replacementText = getReplacementTextFieldText();
+                }
+
+                // Save the unit
+                configManager.saveProcessingUnit(unit);
+                Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS, "Unit created and added to pipeline!");
+
+                // Refresh available units list
+                availableUnits = configManager.getProcessingUnits();
+
+                // Add the new unit to the pipeline
+                addUnitReferencePanel(unit, true);
+
+                // Close the dialog
+                parentDialog.dispose();
+            }
+        };
+
+        return editorForm;
+    }
+
     private void showAddUnitDialog() {
+        // Refresh available units
+        availableUnits = configManager.getProcessingUnits();
+
         if (availableUnits.isEmpty()) {
             JOptionPane.showMessageDialog(this,
-                    "No processing units available. Please create units in the Unit Library first.",
+                    "No processing units available. Please create a unit first using 'Create New Unit'.",
                     "No Units Available",
                     JOptionPane.INFORMATION_MESSAGE);
             return;
@@ -157,7 +228,7 @@ public class PipelineEditorForm extends JPanel {
         String selected = (String) JOptionPane.showInputDialog(
                 this,
                 "Select a unit to add to this pipeline:",
-                "Add Unit",
+                "Add Existing Unit",
                 JOptionPane.PLAIN_MESSAGE,
                 null,
                 unitNames,

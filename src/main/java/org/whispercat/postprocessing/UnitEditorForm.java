@@ -264,7 +264,7 @@ public class UnitEditorForm extends JPanel {
         updateFieldsVisibility();
     }
 
-    private void saveAndReturn() {
+    protected void saveAndReturn() {
         if (!validateData()) {
             return;
         }
@@ -309,7 +309,7 @@ public class UnitEditorForm extends JPanel {
         mainForm.showForm(new UnitLibraryListForm(configManager, mainForm));
     }
 
-    private boolean validateData() {
+    protected boolean validateData() {
         // Validate name
         if (nameField.getText().trim().isEmpty()) {
             nameField.setBorder(BorderFactory.createLineBorder(Color.RED));
@@ -464,5 +464,44 @@ public class UnitEditorForm extends JPanel {
                 }
             }
         });
+    }
+
+    // Public getter methods for accessing field values (used by PipelineEditorForm)
+    protected String getNameFieldText() {
+        return nameField.getText().trim();
+    }
+
+    protected String getDescriptionFieldText() {
+        return descriptionField.getText().trim();
+    }
+
+    protected String getTypeComboSelection() {
+        return (String) typeCombo.getSelectedItem();
+    }
+
+    protected String getProviderComboSelection() {
+        return (String) providerCombo.getSelectedItem();
+    }
+
+    protected String getModelComboSelection() {
+        return (String) modelCombo.getSelectedItem();
+    }
+
+    protected String getSystemPromptText() {
+        String text = systemPromptArea.getText();
+        return text.equals(SYSTEM_PROMPT_PLACEHOLDER) ? "" : text;
+    }
+
+    protected String getUserPromptText() {
+        String text = userPromptArea.getText();
+        return text.equals(USER_PROMPT_PLACEHOLDER) ? "" : text;
+    }
+
+    protected String getTextToReplaceFieldText() {
+        return textToReplaceField.getText();
+    }
+
+    protected String getReplacementTextFieldText() {
+        return replacementTextField.getText();
     }
 }
