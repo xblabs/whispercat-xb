@@ -5,8 +5,8 @@
             <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n"/>
         </Console>
         <RollingFile name="RollingFile"
-                     fileName="${sys:os.name:windows} ? ${env:APPDATA}/WhisperCat/logs/app.log : ${sys:user.home}/WhisperCat/.config/logs/app.log"
-                     filePattern="${sys:os.name:windows} ? ${env:APPDATA}/WhisperCat/logs/app-%d{yyyy-MM-dd}.log.gz : ${sys:user.home}/WhisperCat/.config/logs/app-%d{yyyy-MM-dd}.log.gz">
+                     fileName="${sys:user.home}/.whispercat/logs/app.log"
+                     filePattern="${sys:user.home}/.whispercat/logs/app-%d{yyyy-MM-dd}.log.gz">
             <PatternLayout>
                 <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
             </PatternLayout>
