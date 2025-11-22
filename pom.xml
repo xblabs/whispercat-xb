@@ -62,6 +62,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.dorkbox</groupId>
+            <artifactId>Notify</artifactId>
+            <version>4.3</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.github.kwhat</groupId>
             <artifactId>jnativehook</artifactId>
             <version>2.2.2</version>
