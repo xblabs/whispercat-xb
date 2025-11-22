@@ -33,15 +33,80 @@ public class OpenAITranscribeClient {
     }
 
     /**
-     * Compresses the audio file by downsampling to reduce file size.
+     * Compresses the audio file to MP3 format using ffmpeg to reduce file size.
+     * This is much more effective than downsampling - can reduce size by 10x or more.
      * Creates a temporary compressed file.
+     *
+     * @param originalFile The original audio file
+     * @return The compressed MP3 file, or null if compression fails
+     */
+    private File compressAudioToMp3(File originalFile) {
+        try {
+            logger.info("Compressing audio file to MP3: {} (size: {} MB)",
+                originalFile.getName(), originalFile.length() / (1024.0 * 1024.0));
+
+            // Create temporary MP3 file
+            File mp3File = File.createTempFile("whispercat_compressed_", ".mp3");
+            mp3File.deleteOnExit();
+
+            // Use ffmpeg to convert to MP3 with good compression
+            // -y = overwrite output file
+            // -i = input file
+            // -codec:a libmp3lame = use LAME MP3 encoder
+            // -q:a 4 = VBR quality (0-9, where 0 is best, 9 is worst; 4 is good for speech ~140kbps)
+            // -ac 1 = mono audio (speech doesn't need stereo, halves file size)
+            // -ar 16000 = 16kHz sample rate (good for speech recognition)
+            ProcessBuilder pb = new ProcessBuilder(
+                "ffmpeg",
+                "-y",
+                "-i", originalFile.getAbsolutePath(),
+                "-codec:a", "libmp3lame",
+                "-q:a", "4",
+                "-ac", "1",
+                "-ar", "16000",
+                mp3File.getAbsolutePath()
+            );
+
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            // Read output to prevent blocking
+            StringBuilder output = new StringBuilder();
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+
+            int exitCode = process.waitFor();
+            if (exitCode == 0 && mp3File.exists() && mp3File.length() > 0) {
+                logger.info("Successfully compressed to MP3: {} (size: {} MB, compression ratio: {:.1f}x)",
+                    mp3File.getName(),
+                    mp3File.length() / (1024.0 * 1024.0),
+                    (double) originalFile.length() / mp3File.length());
+                return mp3File;
+            } else {
+                logger.error("ffmpeg conversion failed with exit code: {}. Output: {}", exitCode, output);
+                return null;
+            }
+        } catch (Exception e) {
+            logger.error("Failed to compress audio file to MP3", e);
+            return null;
+        }
+    }
+
+    /**
+     * Legacy compression method using downsampling.
+     * Kept as fallback if ffmpeg is not available.
      *
      * @param originalFile The original audio file
      * @return The compressed audio file, or the original if compression fails
      */
-    private File compressAudioFile(File originalFile) {
+    private File compressAudioFileByDownsampling(File originalFile) {
         try {
-            logger.info("Compressing audio file {} (size: {} MB)",
+            logger.info("Compressing audio file by downsampling: {} (size: {} MB)",
                 originalFile.getName(), originalFile.length() / (1024.0 * 1024.0));
 
             // Read the original audio file
@@ -84,6 +149,31 @@ public class OpenAITranscribeClient {
         }
     }
 
+    /**
+     * Compresses the audio file to reduce size before uploading to OpenAI.
+     * First tries MP3 compression via ffmpeg (10x+ compression).
+     * Falls back to downsampling if ffmpeg is not available.
+     *
+     * @param originalFile The original audio file
+     * @return The compressed audio file, or the original if compression fails
+     */
+    private File compressAudioFile(File originalFile) {
+        // Try MP3 compression first (much better compression)
+        File mp3File = compressAudioToMp3(originalFile);
+        if (mp3File != null && mp3File.length() < originalFile.length()) {
+            // Check if MP3 is still too large
+            if (mp3File.length() > MAX_FILE_SIZE) {
+                logger.warn("MP3 file still exceeds size limit ({} MB). File may be too long for OpenAI.",
+                    mp3File.length() / (1024.0 * 1024.0));
+            }
+            return mp3File;
+        }
+
+        // Fall back to downsampling if ffmpeg failed or is not available
+        logger.warn("MP3 compression failed or not available. Falling back to downsampling.");
+        return compressAudioFileByDownsampling(originalFile);
+    }
+
     public String transcribe(File audioFile) throws IOException {
         // Check if file size exceeds limit and compress if necessary
         File fileToTranscribe = audioFile;
@@ -106,8 +196,21 @@ public class OpenAITranscribeClient {
             HttpPost httpPost = new HttpPost(API_URL);
             httpPost.setHeader("Authorization", "Bearer " + configManager.getApiKey());
 
+            // Determine content type based on file extension
+            String fileName = fileToTranscribe.getName().toLowerCase();
+            String contentType = "audio/wav"; // default
+            if (fileName.endsWith(".mp3")) {
+                contentType = "audio/mpeg";
+            } else if (fileName.endsWith(".m4a")) {
+                contentType = "audio/mp4";
+            } else if (fileName.endsWith(".ogg")) {
+                contentType = "audio/ogg";
+            } else if (fileName.endsWith(".flac")) {
+                contentType = "audio/flac";
+            }
+
             MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-            builder.addBinaryBody("file", fileToTranscribe, ContentType.create("audio/wav"), fileToTranscribe.getName());
+            builder.addBinaryBody("file", fileToTranscribe, ContentType.create(contentType), fileToTranscribe.getName());
             builder.addTextBody("model", "whisper-1");
 
             HttpEntity multipart = builder.build();
