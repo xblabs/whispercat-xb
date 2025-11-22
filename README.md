@@ -50,9 +50,31 @@ This is an enhanced fork by [xblabs](https://github.com/xblabs) with significant
 - **Sorted Lists** - Alphabetically organized pipelines and units for easy navigation
 - **Large File Support** - Automatic audio compression for files exceeding OpenAI's 25MB limit
 
+💡 **Intelligent Audio Processing:**
+- **Automatic Silence Removal** - RMS-based silence detection removes pauses/silence before transcription
+  - Reduces file size by 20-40% for typical recordings with reading/thinking pauses
+  - Lowers transcription costs (less audio = fewer tokens)
+  - Avoids hitting OpenAI's 25MB file limit
+  - Conservative detection (1500ms minimum, -40dB threshold) prevents false positives
+  - Advanced settings UI with sliders for threshold and duration fine-tuning
+  - Detailed console logging shows reduction statistics
+  - Optional compressed file retention for debugging
+
 ### xblabs Fork Changelog
 
-#### Latest Update (2025-11-21)
+#### Latest Update (2025-11-22)
+- **Intelligent Silence Removal** 💡:
+  - Automatic detection and removal of silence/pauses before transcription
+  - RMS amplitude analysis with 100ms window-based detection
+  - Conservative parameters: 1500ms minimum duration, 0.01 (-40dB) threshold
+  - Reduces file size by 20-40% for typical recordings
+  - Advanced settings UI with sliders for threshold (0.001-0.050) and duration (500-3000ms)
+  - Detailed console logging: original duration, detected silence, reduction %, compressed duration
+  - Optional compressed file retention toggle
+  - Automatic application to all recordings before transcription
+  - Benefits: lower costs, avoid 25MB limit, better transcription quality
+
+#### Update (2025-11-21)
 - **Major Architecture Overhaul**:
   - Introduced Processing Unit Library for reusable post-processing components
   - Pipelines now reference units instead of embedding steps directly
