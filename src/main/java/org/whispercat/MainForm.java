@@ -95,24 +95,26 @@ public class MainForm extends JLayeredPane {
             globalHotkeyListener.updateKeyCombination(configManager.getKeyCombination());
             globalHotkeyListener.updateKeySequence(configManager.getKeySequence());
 
-            // stop recording only if there is a switch from dashboard to another sidemenu
-            if( index != 0 && recorderForm != null) {
-                recorderForm.stopRecording(true);
-                recorderForm = null;
-            }
+            // Don't stop recording when switching screens - let user keep recording
+            // Recording continues in background, only stopped by explicit user action
 
-            if( index != 0 && settingsForm != null) {
+            // Stop audio test when leaving settings
+            if( index != 1 && settingsForm != null) {
                 settingsForm.stopAudioTest();
-                settingsForm = null;
             }
 
-            if (index == 0 && recorderForm == null) {
-                this.recorderForm = new RecorderForm(configManager);
-                this.recorderForm = new RecorderForm(configManager);
+            // Reuse RecorderForm instance to preserve state (transcription, logs, etc.)
+            if (index == 0) {
+                if (recorderForm == null) {
+                    recorderForm = new RecorderForm(configManager);
+                }
                 showForm(recorderForm);
             } else if (index == 1) {
                 if (subIndex == 1) {
-                    settingsForm = new SettingsForm(configManager);
+                    // Reuse SettingsForm instance to preserve slider values
+                    if (settingsForm == null) {
+                        settingsForm = new SettingsForm(configManager);
+                    }
                     showForm(settingsForm);
                     globalHotkeyListener.setOptionsDialogOpen(true, settingsForm.getKeybindTextField(), settingsForm.getKeySequenceTextField());
                 } else if (subIndex == 2) {

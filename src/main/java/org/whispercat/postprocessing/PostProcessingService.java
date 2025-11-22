@@ -412,13 +412,19 @@ public class PostProcessingService {
 
         if (batch.isOptimizable) {
             // Optimized: execute as single API call with chained prompt
-            console.log("⚡ Optimizing " + batch.units.size() + " consecutive " + batch.provider + " calls into 1");
+            int savedCalls = batch.units.size() - 1;
+            console.separator();
+            console.log("⚡ PIPELINE OPTIMIZATION ACTIVE");
+            console.log("  Merging " + batch.units.size() + " consecutive " + batch.provider + "/" + batch.model + " units");
+            console.log("  Benefit: " + savedCalls + " API call" + (savedCalls > 1 ? "s" : "") + " saved, " +
+                       (savedCalls * 100 / batch.units.size()) + "% cost reduction");
             console.separator();
 
             // Log each unit that's being merged
+            console.log("  Units being merged:");
             for (int i = 0; i < batch.units.size(); i++) {
                 ProcessingUnit unit = batch.units.get(i);
-                console.log("  Fragment " + (i + 1) + "/" + batch.units.size() + ": " + unit.name);
+                console.log("    " + (i + 1) + ". " + unit.name);
             }
 
             // Compile the chained prompt
@@ -431,8 +437,7 @@ public class PostProcessingService {
             console.logPrompt("  Compiled System Prompt", systemPrompt);
             console.logPrompt("  Compiled User Prompt", userPrompt);
             console.log("");
-            console.log("  Provider: " + batch.provider + " | Model: " + batch.model);
-            console.log("  Calling " + batch.provider + " API with chained prompt...");
+            console.log("  Executing optimized chain...");
 
             try {
                 String result;
@@ -444,7 +449,9 @@ public class PostProcessingService {
                     console.logError("Unknown provider: " + batch.provider);
                     return inputText;
                 }
-                console.logSuccess("Chained API call completed");
+                console.separator();
+                console.logSuccess("✓ Optimized chain completed - " + savedCalls + " API call" +
+                                 (savedCalls > 1 ? "s" : "") + " saved!");
                 console.separator();
                 return result;
             } catch (IOException e) {

@@ -98,8 +98,12 @@ public class TrayIconManager {
     public void showSystemNotification(String title, String message) {
         if (systemTray != null) {
             try {
-                // Use the dorkbox notification system - it's cross-platform
+                // Update tray status text
                 systemTray.setStatus(message);
+
+                // Show a tooltip notification on the tray icon
+                // Note: The dorkbox SystemTray library doesn't directly support notification balloons,
+                // but the status text will be visible when hovering over the tray icon
 
                 // Log the notification
                 logger.info("System notification: {} - {}", title, message);
