@@ -310,7 +310,7 @@ public class RecorderForm extends javax.swing.JPanel {
         // Console log panel
         JPanel consolePanel = new JPanel(new BorderLayout());
         consolePanel.setBorder(BorderFactory.createTitledBorder("Execution Log"));
-        consoleLogArea = new JTextArea(8, 20);
+        consoleLogArea = new JTextArea(15, 20);  // Increased from 8 to 15 rows for better visibility
         consoleLogArea.setEditable(false);
         consoleLogArea.setLineWrap(true);
         consoleLogArea.setWrapStyleWord(true);
@@ -346,11 +346,11 @@ public class RecorderForm extends javax.swing.JPanel {
                 layout.createSequentialGroup()
                         .addContainerGap()
                         .addComponent(centerPanel)
-                        .addGap(20)  // Spacing between sections
+                        .addGap(10)  // Reduced spacing between sections (was 20)
                         .addComponent(postProcessingContainerPanel)
-                        .addGap(20)  // Spacing between sections
-                        .addComponent(consolePanel, 150, 150, 150)
-                        .addContainerGap(20, Short.MAX_VALUE)
+                        .addGap(10)  // Reduced spacing between sections (was 20)
+                        .addComponent(consolePanel, 250, 300, 350)  // Increased height for taller log (was 150)
+                        .addContainerGap(10, Short.MAX_VALUE)  // Reduced bottom margin
         );
 
         // Enable drag & drop for audio files
@@ -411,19 +411,33 @@ public class RecorderForm extends javax.swing.JPanel {
      */
     private void handleDroppedAudioFile(File file) {
         logger.info("Dropped file: " + file.getName());
+        ConsoleLogger console = ConsoleLogger.getInstance();
+        console.separator();
+        console.log("📁 Dropped audio file: " + file.getName());
+        console.log("   Size: " + String.format("%.2f MB", file.length() / (1024.0 * 1024.0)));
+
         File fileToTranscribe = file;
+
+        // Update UI to show processing (blue indicator)
+        updateUIForRecordingStop();
 
         // Check if OGG file and convert to WAV
         if (file.getName().toLowerCase().endsWith(".ogg")) {
             logger.info("Converting OGG file to WAV...");
+            console.log("⚙ Converting OGG to WAV...");
             Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
                     "Converting OGG to WAV...");
             fileToTranscribe = convertOggToWav(file);
             if (fileToTranscribe == null) {
+                console.logError("OGG conversion failed - Java doesn't natively support OGG");
+                console.log("💡 Solution: Convert to WAV manually using VLC, Audacity, or ffmpeg");
+                console.log("   Example: ffmpeg -i input.ogg output.wav");
                 Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
-                        "Failed to convert OGG file. Please convert to WAV manually.");
+                        "OGG conversion failed. Convert to WAV manually (use VLC/Audacity/ffmpeg).");
+                resetUIAfterTranscription();
                 return;
             }
+            console.logSuccess("OGG converted to WAV successfully");
         }
 
         // Transcribe the file
@@ -703,6 +717,23 @@ public class RecorderForm extends javax.swing.JPanel {
                 console.separator();
                 console.log("Starting transcription using " + server);
                 console.log("Audio file: " + fileToTranscribe.getName());
+
+                // Check file size limits BEFORE attempting upload
+                long fileSizeBytes = fileToTranscribe.length();
+                long fileSizeMB = fileSizeBytes / (1024 * 1024);
+                console.log(String.format("File size: %.2f MB", fileSizeBytes / (1024.0 * 1024.0)));
+
+                // OpenAI has 25MB limit
+                if (server.equals("OpenAI") && fileSizeBytes > 25 * 1024 * 1024) {
+                    String errorMsg = String.format("File too large (%.1f MB). OpenAI limit is 25 MB.",
+                                                   fileSizeBytes / (1024.0 * 1024.0));
+                    console.logError(errorMsg);
+                    console.log("💡 Try enabling silence removal in Options to reduce file size");
+                    console.log("   Or use a different transcription service (Faster-Whisper, Open WebUI)");
+                    Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                            "File exceeds 25 MB OpenAI limit. Enable silence removal or use different service.");
+                    return null;
+                }
 
                 long transcriptionStartTime = System.currentTimeMillis();
                 String result = null;
