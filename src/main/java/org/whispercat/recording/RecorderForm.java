@@ -364,28 +364,9 @@ public class RecorderForm extends javax.swing.JPanel {
         panel.setTransferHandler(new TransferHandler() {
             @Override
             public boolean canImport(TransferSupport support) {
-                if (!support.isDrop()) {
-                    return false;
-                }
-                try {
-                    // Check if the dropped item is a file
-                    if (support.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-                        @SuppressWarnings("unchecked")
-                        List<File> files = (List<File>) support.getTransferable()
-                                .getTransferData(DataFlavor.javaFileListFlavor);
-                        if (files != null && files.size() == 1) {
-                            File file = files.get(0);
-                            String fileName = file.getName().toLowerCase();
-                            // Accept WAV, MP3, OGG, M4A, FLAC files
-                            return fileName.endsWith(".wav") || fileName.endsWith(".mp3") ||
-                                   fileName.endsWith(".ogg") || fileName.endsWith(".m4a") ||
-                                   fileName.endsWith(".flac");
-                        }
-                    }
-                } catch (Exception e) {
-                    logger.error("Error checking drag and drop support", e);
-                }
-                return false;
+                // Only check if it's a drop operation with file list flavor
+                // DO NOT access the actual data here - that causes InvalidDnDOperationException
+                return support.isDrop() && support.isDataFlavorSupported(DataFlavor.javaFileListFlavor);
             }
 
             @Override
@@ -397,10 +378,23 @@ public class RecorderForm extends javax.swing.JPanel {
                     @SuppressWarnings("unchecked")
                     List<File> files = (List<File>) support.getTransferable()
                             .getTransferData(DataFlavor.javaFileListFlavor);
+
+                    // Validate: only accept single audio files
                     if (files != null && files.size() == 1) {
                         File file = files.get(0);
-                        handleDroppedAudioFile(file);
-                        return true;
+                        String fileName = file.getName().toLowerCase();
+
+                        // Accept WAV, MP3, OGG, M4A, FLAC files
+                        if (fileName.endsWith(".wav") || fileName.endsWith(".mp3") ||
+                            fileName.endsWith(".ogg") || fileName.endsWith(".m4a") ||
+                            fileName.endsWith(".flac")) {
+                            handleDroppedAudioFile(file);
+                            return true;
+                        } else {
+                            Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                                    "Unsupported file type. Use WAV, MP3, OGG, M4A, or FLAC files.");
+                            return false;
+                        }
                     }
                 } catch (Exception e) {
                     logger.error("Error importing dropped file", e);
