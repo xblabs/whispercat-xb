@@ -412,6 +412,7 @@ public class RecorderForm extends javax.swing.JPanel {
 
     /**
      * Handles a dropped audio file by converting if necessary and transcribing.
+     * Uses background processing to prevent UI freezing on large files.
      */
     private void handleDroppedAudioFile(File file) {
         logger.info("Dropped file: " + file.getName());
@@ -420,48 +421,29 @@ public class RecorderForm extends javax.swing.JPanel {
         console.log("📁 Dropped audio file: " + file.getName());
         console.log("   Size: " + String.format("%.2f MB", file.length() / (1024.0 * 1024.0)));
 
-        File fileToTranscribe = file;
+        // Check file size limits BEFORE processing (API limits vary by server)
+        long fileSizeBytes = file.length();
+        String server = configManager.getWhisperServer();
+
+        // OpenAI has 25MB limit
+        if (server.equals("OpenAI") && fileSizeBytes > 25 * 1024 * 1024) {
+            String errorMsg = String.format("File too large (%.1f MB). OpenAI limit is 25 MB.",
+                                           fileSizeBytes / (1024.0 * 1024.0));
+            console.logError(errorMsg);
+            console.log("💡 Try:");
+            console.log("   • Enable silence removal in Options to reduce file size");
+            console.log("   • Use a different transcription service (Faster-Whisper, Open WebUI)");
+            console.log("   • Split the audio into smaller files");
+            Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                    "File exceeds 25 MB OpenAI limit");
+            return;
+        }
 
         // Update UI to show processing (blue indicator)
         updateUIForRecordingStop();
 
-        // Check if OGG file and convert to WAV
-        if (file.getName().toLowerCase().endsWith(".ogg")) {
-            logger.info("Converting OGG file to WAV...");
-            console.log("⚙ Converting OGG to WAV...");
-            Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
-                    "Converting OGG to WAV...");
-            fileToTranscribe = convertOggToWav(file);
-            if (fileToTranscribe == null) {
-                console.logError("OGG conversion failed");
-                if (!isFfmpegAvailable()) {
-                    console.log("⚠ ffmpeg not installed - automatic OGG conversion unavailable");
-                    console.log("💡 Install ffmpeg for automatic OGG conversion:");
-                    console.log("   Windows: choco install ffmpeg  OR  download from ffmpeg.org");
-                    console.log("   Linux: sudo apt install ffmpeg");
-                    console.log("   macOS: brew install ffmpeg");
-                    console.log("");
-                    console.log("💡 Or convert manually:");
-                    console.log("   ffmpeg -i input.ogg output.wav");
-                    console.log("   Or use VLC, Audacity, or any audio converter");
-                    Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
-                            "OGG conversion failed. Install ffmpeg or convert to WAV manually.");
-                } else {
-                    console.log("💡 Solution: Convert to WAV manually using VLC, Audacity, or ffmpeg");
-                    console.log("   Example: ffmpeg -i input.ogg output.wav");
-                    Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
-                            "OGG conversion failed. Convert to WAV manually (use VLC/Audacity/ffmpeg).");
-                }
-                resetUIAfterTranscription();
-                return;
-            }
-            console.logSuccess("OGG converted to WAV successfully");
-        }
-
-        // Transcribe the file
-        Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
-                "Transcribing audio file...");
-        new AudioTranscriptionWorker(fileToTranscribe).execute();
+        // Process file in background (OGG conversion can take time on large files)
+        new FileDropProcessingWorker(file).execute();
     }
 
     /**
@@ -620,6 +602,9 @@ public class RecorderForm extends javax.swing.JPanel {
     private boolean isStoppingInProgress = false;
 
     public void stopRecording(boolean cancelledRecording) {
+        // Set isRecording to false BEFORE updateUIForRecordingStop()
+        // so the status indicator shows blue (transcribing), not red (recording)
+        isRecording = false;
         updateUIForRecordingStop();
         isStoppingInProgress = true;
         recordButton.setText("Converting. Please wait...");
@@ -753,6 +738,77 @@ public class RecorderForm extends javax.swing.JPanel {
         }
     }
 
+    /**
+     * Background worker for processing dropped audio files.
+     * Handles OGG conversion off the EDT to prevent UI freezing on large files.
+     */
+    private class FileDropProcessingWorker extends SwingWorker<File, Void> {
+        private final File originalFile;
+
+        public FileDropProcessingWorker(File file) {
+            this.originalFile = file;
+        }
+
+        @Override
+        protected File doInBackground() {
+            ConsoleLogger console = ConsoleLogger.getInstance();
+            File fileToTranscribe = originalFile;
+
+            // Check if OGG file and convert to WAV (in background to prevent UI freeze)
+            if (originalFile.getName().toLowerCase().endsWith(".ogg")) {
+                logger.info("Converting OGG file to WAV in background...");
+                console.log("⚙ Converting OGG to WAV...");
+                Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
+                        "Converting OGG to WAV...");
+                fileToTranscribe = convertOggToWav(originalFile);
+                if (fileToTranscribe == null) {
+                    console.logError("OGG conversion failed");
+                    if (!isFfmpegAvailable()) {
+                        console.log("⚠ ffmpeg not installed - automatic OGG conversion unavailable");
+                        console.log("💡 Install ffmpeg for automatic OGG conversion:");
+                        console.log("   Windows: choco install ffmpeg  OR  download from ffmpeg.org");
+                        console.log("   Linux: sudo apt install ffmpeg");
+                        console.log("   macOS: brew install ffmpeg");
+                        console.log("");
+                        console.log("💡 Or convert manually:");
+                        console.log("   ffmpeg -i input.ogg output.wav");
+                        console.log("   Or use VLC, Audacity, or any audio converter");
+                        Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                                "OGG conversion failed. Install ffmpeg or convert to WAV manually.");
+                    } else {
+                        console.log("💡 Solution: Convert to WAV manually using VLC, Audacity, or ffmpeg");
+                        console.log("   Example: ffmpeg -i input.ogg output.wav");
+                        Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                                "OGG conversion failed. Convert to WAV manually (use VLC/Audacity/ffmpeg).");
+                    }
+                    return null;
+                }
+                console.logSuccess("OGG converted to WAV successfully");
+            }
+
+            return fileToTranscribe;
+        }
+
+        @Override
+        protected void done() {
+            try {
+                File fileToTranscribe = get();
+                if (fileToTranscribe != null) {
+                    // Conversion successful (or wasn't needed), proceed with transcription
+                    Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
+                            "Transcribing audio file...");
+                    new AudioTranscriptionWorker(fileToTranscribe).execute();
+                } else {
+                    // Conversion failed, reset UI
+                    resetUIAfterTranscription();
+                }
+            } catch (Exception e) {
+                logger.error("Error processing dropped file", e);
+                ConsoleLogger.getInstance().logError("Error processing file: " + e.getMessage());
+                resetUIAfterTranscription();
+            }
+        }
+    }
 
     private class AudioTranscriptionWorker extends SwingWorker<String, Void> {
         private final File audioFile;
