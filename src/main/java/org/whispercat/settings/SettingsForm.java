@@ -676,18 +676,23 @@ public class SettingsForm extends JPanel {
 
         loadSettings();
 
+        // Wrap content panel in a scroll pane for vertical scrolling
+        JScrollPane scrollPane = new JScrollPane(contentPanel);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16); // Smoother scrolling
+        scrollPane.setBorder(null); // Remove border for cleaner look
+
         // Set the layout for the SettingsForm panel using GroupLayout
         GroupLayout layout = new GroupLayout(this);
         this.setLayout(layout);
         layout.setHorizontalGroup(
                 layout.createParallelGroup(GroupLayout.Alignment.CENTER)
-                        .addComponent(contentPanel)
+                        .addComponent(scrollPane)
         );
         layout.setVerticalGroup(
                 layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addComponent(contentPanel)
-                        .addContainerGap(237, Short.MAX_VALUE)
+                        .addComponent(scrollPane)
         );
     }
 

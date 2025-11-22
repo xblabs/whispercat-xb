@@ -720,7 +720,9 @@ public class RecorderForm extends javax.swing.JPanel {
             } finally {
                 resetUIAfterTranscription();
                 isRecording = false;
-                if (enablePostProcessingCheckBox.isSelected() && postProcessingSelectComboBox.getSelectedItem() != null) {
+                // Only run post-processing if we have a valid transcript
+                if (transcript != null && !transcript.trim().isEmpty() &&
+                    enablePostProcessingCheckBox.isSelected() && postProcessingSelectComboBox.getSelectedItem() != null) {
                     PostProcessingItem selectedItem = (PostProcessingItem) postProcessingSelectComboBox.getSelectedItem();
                     if (selectedItem != null && selectedItem.uuid != null) {
                         Pipeline pipeline = configManager.getPipelineByUuid(selectedItem.uuid);
