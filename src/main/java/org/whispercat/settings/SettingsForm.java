@@ -287,6 +287,10 @@ public class SettingsForm extends JPanel {
         silenceThresholdSlider.addChangeListener(e -> {
             float value = silenceThresholdSlider.getValue() / 1000.0f;
             thresholdValueLabel.setText(String.format("%.3f", value));
+            // Auto-save when slider stops moving (not dragging)
+            if (!silenceThresholdSlider.getValueIsAdjusting()) {
+                configManager.setSilenceThreshold(value);
+            }
         });
 
         gbc.gridx = 1;
@@ -331,6 +335,10 @@ public class SettingsForm extends JPanel {
 
         minSilenceDurationSlider.addChangeListener(e -> {
             durationValueLabel.setText(minSilenceDurationSlider.getValue() + "ms");
+            // Auto-save when slider stops moving
+            if (!minSilenceDurationSlider.getValueIsAdjusting()) {
+                configManager.setMinSilenceDuration(minSilenceDurationSlider.getValue());
+            }
         });
 
         gbc.gridx = 1;
@@ -376,6 +384,10 @@ public class SettingsForm extends JPanel {
         minRecordingDurationSlider.addChangeListener(e -> {
             int value = minRecordingDurationSlider.getValue();
             minRecDurationValueLabel.setText(value + "s");
+            // Auto-save when slider stops moving
+            if (!minRecordingDurationSlider.getValueIsAdjusting()) {
+                configManager.setMinRecordingDurationForSilenceRemoval(value);
+            }
         });
 
         gbc.gridx = 1;
