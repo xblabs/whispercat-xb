@@ -42,6 +42,7 @@ public class RecorderForm extends javax.swing.JPanel {
     private final FasterWhisperTranscribeClient fasterWhisperTranscribeClient;
     private final OpenWebUITranscribeClient openWebUITranscribeClient;
     private boolean isRecording = false;
+    private boolean isTranscribing = false;  // Track transcription/conversion state
     private AudioRecorder recorder;
     private final JTextArea transcriptionTextArea;
     private final JPanel statusIndicatorPanel;  // Status circles instead of large logo
@@ -77,10 +78,12 @@ public class RecorderForm extends javax.swing.JPanel {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-                // Default: green (ready)
-                g2.setColor(new Color(144, 238, 144)); // Light green
+                // Status colors: green (ready), red (recording), blue (transcribing)
+                g2.setColor(new Color(144, 238, 144)); // Light green - ready/idle
                 if (isRecording) {
-                    g2.setColor(new Color(255, 99, 71)); // Tomato red when recording
+                    g2.setColor(new Color(255, 99, 71)); // Tomato red - recording
+                } else if (isTranscribing) {
+                    g2.setColor(new Color(100, 149, 237)); // Cornflower blue - transcribing/converting
                 }
                 g2.fillOval(2, 2, 16, 16);
 
@@ -611,7 +614,8 @@ public class RecorderForm extends javax.swing.JPanel {
     }
 
     private void updateUIForRecordingStop() {
-        // Repaint status indicator
+        // Set transcribing state (blue indicator)
+        isTranscribing = true;
         statusIndicatorPanel.repaint();
 
         recordButton.setText("Converting. Please wait...");
@@ -620,6 +624,7 @@ public class RecorderForm extends javax.swing.JPanel {
 
     private void resetUIAfterTranscription() {
         isStoppingInProgress = false;
+        isTranscribing = false;  // Reset to idle state (green indicator)
 
         // Repaint status indicator to show ready state (green circle)
         statusIndicatorPanel.repaint();
