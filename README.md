@@ -56,24 +56,46 @@ This is an enhanced fork by [xblabs](https://github.com/xblabs) with significant
   - Reduces file size by 20-40% for typical recordings with reading/thinking pauses
   - Lowers transcription costs (less audio = fewer tokens)
   - Avoids hitting OpenAI's 25MB file limit
-  - Conservative detection (1500ms minimum, -40dB threshold) prevents false positives
-  - Advanced settings UI with sliders for threshold and duration fine-tuning
-  - Detailed console logging shows reduction statistics
+  - Advanced settings UI with sliders for threshold (0.001-0.050) and duration (500-10000ms)
+  - **Auto-save sliders** - Changes save immediately without clicking Save button
+  - **Real-time diagnostics** - Shows actual audio RMS values (min/max/avg) to help tune settings
+  - **Smart warnings** - Detects when audio is too quiet or threshold needs adjustment
+  - **Quiet speaker optimization** - Detailed guidance for users who speak softly
+  - Configurable minimum recording duration (skip silence removal for short clips)
+  - Detailed console logging shows reduction statistics and RMS analysis
   - Optional compressed file retention for debugging
 
 ### xblabs Fork Changelog
 
 #### Latest Update (2025-11-22)
+- **Critical UI State Persistence Fixes** 🔧:
+  - Recording no longer stops when switching screens (continues in background)
+  - Transcription text persists when navigating between Record/Options screens
+  - Execution log persists across screen switches
+  - Silence threshold sliders auto-save on change (no Save button required)
+  - Fixed transcript duplication bug when auto-paste is enabled
+- **Enhanced Silence Removal Diagnostics** 🔍:
+  - Real-time RMS analysis logging (min/max/avg) for debugging detection issues
+  - Smart detection of quiet recordings with actionable suggestions
+  - Console output shows: "Audio RMS analysis: min=0.0012, max=0.0419, avg=0.0020"
+  - Helpful warnings when threshold doesn't match audio levels
+  - Optimized for quiet speakers with adjustable thresholds
 - **Intelligent Silence Removal** 💡:
   - Automatic detection and removal of silence/pauses before transcription
   - RMS amplitude analysis with 100ms window-based detection
-  - Conservative parameters: 1500ms minimum duration, 0.01 (-40dB) threshold
+  - Default parameters: 1500ms minimum duration, 0.01 (-40dB) threshold
   - Reduces file size by 20-40% for typical recordings
-  - Advanced settings UI with sliders for threshold (0.001-0.050) and duration (500-3000ms)
+  - Advanced settings UI with sliders for threshold (0.001-0.050) and duration (500-10000ms)
   - Detailed console logging: original duration, detected silence, reduction %, compressed duration
+  - Configurable minimum recording duration threshold (skip silence removal for short clips)
   - Optional compressed file retention toggle
   - Automatic application to all recordings before transcription
   - Benefits: lower costs, avoid 25MB limit, better transcription quality
+- **Improved Pipeline Optimization Logging** ⚡:
+  - Clearer header: "⚡ PIPELINE OPTIMIZATION ACTIVE"
+  - Shows exact benefit: "2 API calls saved, 66% cost reduction"
+  - Numbered list of units being merged
+  - Better visual separation and success confirmation
 
 #### Update (2025-11-21)
 - **Major Architecture Overhaul**:
