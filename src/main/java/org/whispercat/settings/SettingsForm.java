@@ -321,9 +321,9 @@ public class SettingsForm extends JPanel {
         contentPanel.add(durationLabel, gbc);
 
         JPanel durationPanel = new JPanel(new BorderLayout(5, 0));
-        minSilenceDurationSlider = new JSlider(500, 3000, configManager.getMinSilenceDuration());
-        minSilenceDurationSlider.setMajorTickSpacing(500);
-        minSilenceDurationSlider.setMinorTickSpacing(100);
+        minSilenceDurationSlider = new JSlider(500, 10000, configManager.getMinSilenceDuration());
+        minSilenceDurationSlider.setMajorTickSpacing(1000);
+        minSilenceDurationSlider.setMinorTickSpacing(500);
         minSilenceDurationSlider.setPaintTicks(true);
         JLabel durationValueLabel = new JLabel(configManager.getMinSilenceDuration() + "ms");
         durationPanel.add(minSilenceDurationSlider, BorderLayout.CENTER);
