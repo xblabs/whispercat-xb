@@ -50,6 +50,7 @@ public class SilenceRemover {
     public static File removeSilence(File originalFile, float silenceThresholdRMS,
                                      int minSilenceDurationMs, boolean keepCompressed) {
         ConsoleLogger console = ConsoleLogger.getInstance();
+        long startTime = System.currentTimeMillis();
 
         try {
             console.log("Analyzing audio for silence...");
@@ -154,7 +155,9 @@ public class SilenceRemover {
             AudioSystem.write(compressedStream, AudioFileFormat.Type.WAVE, compressedFile);
             compressedStream.close();
 
+            long elapsedTime = System.currentTimeMillis() - startTime;
             console.logSuccess("Silence removed: " + compressedFile.getName());
+            console.log(String.format("Silence removal took %dms", elapsedTime));
 
             // Delete compressed file after use if configured
             if (!keepCompressed) {

@@ -709,15 +709,18 @@ public class RecorderForm extends javax.swing.JPanel {
                 console.log("Starting transcription using " + server);
                 console.log("Audio file: " + fileToTranscribe.getName());
 
+                long transcriptionStartTime = System.currentTimeMillis();
+                String result = null;
+
                 if (server.equals("OpenAI")) {
                     logger.info("Transcribing audio using OpenAI");
-                    return whisperClient.transcribe(fileToTranscribe);
+                    result = whisperClient.transcribe(fileToTranscribe);
                 } else if (server.equals("Faster-Whisper")) {
                     logger.info("Transcribing audio using Faster-Whisper");
-                    return fasterWhisperTranscribeClient.transcribe(fileToTranscribe);
+                    result = fasterWhisperTranscribeClient.transcribe(fileToTranscribe);
                 } else if (server.equals("Open WebUI")) {
                     logger.info("Transcribing audio using Open WebUI");
-                    return openWebUITranscribeClient.transcribeAudio(fileToTranscribe);
+                    result = openWebUITranscribeClient.transcribeAudio(fileToTranscribe);
                 } else {
                     logger.error("Unknown Whisper server: " + server);
                     console.logError("Unknown Whisper server: " + server);
@@ -725,6 +728,10 @@ public class RecorderForm extends javax.swing.JPanel {
                             "Unknown Whisper server: " + server);
                     return null;
                 }
+
+                long transcriptionTime = System.currentTimeMillis() - transcriptionStartTime;
+                console.log(String.format("Transcription took %dms", transcriptionTime));
+                return result;
             } catch (Exception e) {
                 logger.error("Error during transcription", e);
                 ConsoleLogger.getInstance().logError("Transcription failed: " + e.getMessage());
