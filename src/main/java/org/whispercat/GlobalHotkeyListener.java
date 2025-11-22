@@ -132,6 +132,13 @@ public class GlobalHotkeyListener implements NativeKeyListener {
             if (!combinationActive) {
                 combinationActive = true;
                 logger.info("Key combination pressed, toggling recording");
+
+                // If on settings screen, save settings before switching
+                if (optionsDialogOpen && ui.settingsForm != null) {
+                    logger.info("Saving settings before switching to recorder");
+                    ui.settingsForm.saveSettings();
+                }
+
                 // Switch to recorder form if not already there
                 ui.setSelectedMenu(0, 0);
                 // Small delay to ensure UI has switched before toggling
@@ -170,6 +177,13 @@ public class GlobalHotkeyListener implements NativeKeyListener {
                     if (sequenceIndex == hotKeySequence.length) {
                         if (currentTime - sequenceStartTime <= 1000) {
                             logger.info("Key sequence completed, toggling recording");
+
+                            // If on settings screen, save settings before switching
+                            if (optionsDialogOpen && ui.settingsForm != null) {
+                                logger.info("Saving settings before switching to recorder");
+                                ui.settingsForm.saveSettings();
+                            }
+
                             // Switch to recorder form if not already there
                             ui.setSelectedMenu(0, 0);
                             // Small delay to ensure UI has switched before toggling

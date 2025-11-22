@@ -1099,4 +1099,12 @@ public class SettingsForm extends JPanel {
     public KeySequenceTextField getKeySequenceTextField() {
         return keySequenceTextField;
     }
+
+    /**
+     * Saves all settings without requiring an ActionEvent.
+     * Called when recording hotkey is triggered while on settings screen.
+     */
+    public void saveSettings() {
+        saveSettings(null);
+    }
 }
