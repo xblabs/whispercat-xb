@@ -85,6 +85,12 @@ public class SilenceRemover {
             console.log(String.format("Original duration: %.1fs (%d frames)",
                 originalDurationSec, totalFrames));
 
+            // Safety check: ensure original audio is long enough
+            if (originalDurationSec < 1.0f) {
+                console.log("Original audio too short for silence removal (< 1s), skipping");
+                return originalFile;
+            }
+
             // Detect silence regions
             List<SilenceRegion> silences = detectSilence(audioData, format,
                 silenceThresholdRMS, minSilenceDurationMs);
@@ -105,6 +111,14 @@ public class SilenceRemover {
                 silences.size(), totalSilenceSec));
             console.log(String.format("Reduction: %.1f%%", reductionPercent));
 
+            // Safety check: don't remove more than 90% of audio
+            if (reductionPercent > 90.0f) {
+                console.log("⚠ Silence removal would reduce audio by >90%, skipping");
+                console.log("This may indicate overly aggressive settings");
+                console.log("Using original audio file");
+                return originalFile;
+            }
+
             // Create compressed audio by removing silence
             byte[] compressedData = spliceAudio(audioData, format, silences);
             long compressedFrames = compressedData.length / frameSize;
@@ -112,6 +126,16 @@ public class SilenceRemover {
 
             console.log(String.format("Compressed duration: %.1fs (%d frames)",
                 compressedDurationSec, compressedFrames));
+
+            // Safety check: ensure compressed audio is at least 0.5 seconds
+            // (OpenAI requires 0.1s minimum, we use 0.5s for safety margin)
+            if (compressedDurationSec < 0.5f) {
+                console.log("⚠ Compressed audio too short (" +
+                    String.format("%.2fs", compressedDurationSec) +
+                    "), skipping silence removal");
+                console.log("Using original audio file");
+                return originalFile;
+            }
 
             // Write compressed audio to file
             String compressedFileName = originalFile.getName().replace(".wav", "_nosilence.wav");
