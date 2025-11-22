@@ -632,7 +632,7 @@ public class RecorderForm extends javax.swing.JPanel {
     private boolean isStoppingInProgress = false;
 
     public void stopRecording(boolean cancelledRecording) {
-        updateUIForRecordingStop();
+        updateUIForRecordingStop();  // This already sets isTranscribing = true and repaints
         isStoppingInProgress = true;
         recordButton.setText("Converting. Please wait...");
         //recordButton.setEnabled(false);
@@ -643,6 +643,9 @@ public class RecorderForm extends javax.swing.JPanel {
                 new RecorderForm.AudioTranscriptionWorker(recorder.getOutputFile()).execute();
             } else {
                 logger.info("Recording cancelled");
+                // Reset transcribing state if cancelled
+                isTranscribing = false;
+                statusIndicatorPanel.repaint();
                 updateTrayMenu();
             }
         }
@@ -650,6 +653,11 @@ public class RecorderForm extends javax.swing.JPanel {
 
     public void stopRecording(File audioFile) {
         isStoppingInProgress = true;
+
+        // Set transcribing state (blue indicator) - same as dropped files
+        isTranscribing = true;
+        statusIndicatorPanel.repaint();
+
         recordButton.setText("Converting. Please wait...");
         recordButton.setEnabled(false);
         new RecorderForm.AudioTranscriptionWorker(audioFile).execute();
@@ -723,7 +731,8 @@ public class RecorderForm extends javax.swing.JPanel {
     }
 
     private void updateUIForRecordingStop() {
-        // Set transcribing state (blue indicator)
+        // Stop recording and start transcribing (blue indicator)
+        isRecording = false;  // Must set this BEFORE isTranscribing, or circle stays red!
         isTranscribing = true;
         statusIndicatorPanel.repaint();
 
