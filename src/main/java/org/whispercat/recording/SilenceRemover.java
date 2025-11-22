@@ -91,6 +91,10 @@ public class SilenceRemover {
                 return originalFile;
             }
 
+            // Log detection parameters for transparency
+            console.log(String.format("Silence threshold: %.3f RMS | Min duration: %dms",
+                silenceThresholdRMS, minSilenceDurationMs));
+
             // Detect silence regions
             List<SilenceRegion> silences = detectSilence(audioData, format,
                 silenceThresholdRMS, minSilenceDurationMs);
