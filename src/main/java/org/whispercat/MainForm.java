@@ -98,9 +98,10 @@ public class MainForm extends JLayeredPane {
             // Don't stop recording when switching screens - let user keep recording
             // Recording continues in background, only stopped by explicit user action
 
-            // Stop audio test when leaving settings
+            // Stop audio test and auto-save settings when leaving settings screen
             if( index != 1 && settingsForm != null) {
                 settingsForm.stopAudioTest();
+                settingsForm.saveSettings();  // Auto-save to prevent confusion
             }
 
             // Reuse RecorderForm instance to preserve state (transcription, logs, etc.)
