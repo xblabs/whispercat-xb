@@ -46,7 +46,8 @@ This is an enhanced fork by [xblabs](https://github.com/xblabs) with significant
 - **Dark Mode Default** - Application starts in dark mode for reduced eye strain
 - **Configurable Post-Processing Models** - Add any OpenAI model (GPT-5 nano, mini, etc.) via GUI settings
 - **Drag & Drop Audio Files** - Drop WAV, MP3, M4A, FLAC files directly into the app for transcription
-- **Audio Format Note** - OGG files require manual conversion to WAV (use ffmpeg, VLC, or Audacity) due to Java codec limitations
+- **OGG Audio Support** - Automatic conversion with ffmpeg (if installed), otherwise provides clear conversion instructions
+- **ffmpeg Integration** - Automatically detects and uses ffmpeg for OGG→WAV conversion (Telegram voice notes work out-of-box!)
 - **Smart Recording Activation** - Hotkey automatically switches to recorder screen from any menu
 - **Sorted Lists** - Alphabetically organized pipelines and units for easy navigation
 - **Large File Support** - Automatic audio compression for files exceeding OpenAI's 25MB limit
