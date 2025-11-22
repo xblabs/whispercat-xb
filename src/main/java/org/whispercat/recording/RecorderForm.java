@@ -310,7 +310,7 @@ public class RecorderForm extends javax.swing.JPanel {
         // Console log panel
         JPanel consolePanel = new JPanel(new BorderLayout());
         consolePanel.setBorder(BorderFactory.createTitledBorder("Execution Log"));
-        consoleLogArea = new JTextArea(8, 20);
+        consoleLogArea = new JTextArea(15, 20);  // Increased from 8 to 15 rows for better visibility
         consoleLogArea.setEditable(false);
         consoleLogArea.setLineWrap(true);
         consoleLogArea.setWrapStyleWord(true);
@@ -346,11 +346,11 @@ public class RecorderForm extends javax.swing.JPanel {
                 layout.createSequentialGroup()
                         .addContainerGap()
                         .addComponent(centerPanel)
-                        .addGap(20)  // Spacing between sections
+                        .addGap(10)  // Reduced spacing between sections (was 20)
                         .addComponent(postProcessingContainerPanel)
-                        .addGap(20)  // Spacing between sections
-                        .addComponent(consolePanel, 150, 150, 150)
-                        .addContainerGap(20, Short.MAX_VALUE)
+                        .addGap(10)  // Reduced spacing between sections (was 20)
+                        .addComponent(consolePanel, 250, 300, 350)  // Increased height for taller log (was 150)
+                        .addContainerGap(10, Short.MAX_VALUE)  // Reduced bottom margin
         );
 
         // Enable drag & drop for audio files
