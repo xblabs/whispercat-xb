@@ -1,9 +1,9 @@
-use crate::audio::AudioBuffer;
+use crate::audio::{AudioBuffer, AudioCompressor};
 use crate::error::{Result, WhisperCatError};
 use crate::transcription::types::{
     TranscriptionProvider, TranscriptionRequest, TranscriptionResponse,
 };
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Unified transcription client that routes to different providers
 #[derive(Clone)]
@@ -34,15 +34,42 @@ impl TranscriptionClient {
         }
     }
 
-    pub async fn transcribe(&self, request: TranscriptionRequest) -> Result<TranscriptionResponse> {
-        // Pre-flight checks
+    pub async fn transcribe(&self, mut request: TranscriptionRequest) -> Result<TranscriptionResponse> {
+        // Check if file needs compression and compress if necessary
+        let compressed_file = if AudioCompressor::needs_compression(&request.file_path)? {
+            match AudioCompressor::compress_if_needed(&request.file_path)? {
+                Some(compressed_path) => {
+                    tracing::info!("Using compressed file for transcription: {:?}", compressed_path);
+                    Some(compressed_path)
+                }
+                None => None,
+            }
+        } else {
+            None
+        };
+
+        // Use compressed file if available
+        if let Some(ref compressed_path) = compressed_file {
+            request.file_path = compressed_path.clone();
+        }
+
+        // Validate file size (should be within limits after compression)
         self.validate_file_size(&request.file_path)?;
 
-        match request.provider {
+        // Perform transcription
+        let result = match request.provider {
             TranscriptionProvider::OpenAI => self.transcribe_openai(request).await,
             TranscriptionProvider::FasterWhisper => self.transcribe_faster_whisper(request).await,
             TranscriptionProvider::OpenWebUI => self.transcribe_openwebui(request).await,
+        };
+
+        // Clean up compressed file if it was created
+        if let Some(compressed_path) = compressed_file {
+            std::fs::remove_file(&compressed_path).ok();
+            tracing::debug!("Cleaned up compressed file: {:?}", compressed_path);
         }
+
+        result
     }
 
     async fn transcribe_openai(&self, request: TranscriptionRequest) -> Result<TranscriptionResponse> {
