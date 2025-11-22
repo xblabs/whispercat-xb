@@ -45,8 +45,8 @@ This is an enhanced fork by [xblabs](https://github.com/xblabs) with significant
 - **Responsive Layout** - Controls (paste from clipboard, enable post-processing, etc.) now flow horizontally with responsive wrapping
 - **Dark Mode Default** - Application starts in dark mode for reduced eye strain
 - **Configurable Post-Processing Models** - Add any OpenAI model (GPT-5 nano, mini, etc.) via GUI settings
-- **Drag & Drop Audio Files** - Drop WAV, MP3, OGG, M4A, FLAC files directly into the app for transcription
-- **OGG File Support** - Automatic conversion of Telegram voice notes and other OGG files
+- **Drag & Drop Audio Files** - Drop WAV, MP3, M4A, FLAC files directly into the app for transcription
+- **Audio Format Note** - OGG files require manual conversion to WAV (use ffmpeg, VLC, or Audacity) due to Java codec limitations
 - **Smart Recording Activation** - Hotkey automatically switches to recorder screen from any menu
 - **Sorted Lists** - Alphabetically organized pipelines and units for easy navigation
 - **Large File Support** - Automatic audio compression for files exceeding OpenAI's 25MB limit
@@ -115,8 +115,8 @@ This is an enhanced fork by [xblabs](https://github.com/xblabs) with significant
 - **Responsive Layout**: Controls flow horizontally with responsive wrapping (flexbox-style)
 - **Refined Toast Notifications**: Pastel colors, significantly reduced padding, high-level events only
 - **Configurable Models**: Add custom OpenAI models via Settings GUI
-- **Drag & Drop**: Drop audio files (WAV, MP3, OGG, M4A, FLAC) directly for transcription
-- **OGG Support**: Auto-convert Telegram voice notes (.ogg files)
+- **Drag & Drop**: Drop audio files (WAV, MP3, M4A, FLAC) directly for transcription
+- **Audio Format Support**: WAV, MP3, M4A, FLAC supported; OGG requires manual conversion to WAV (ffmpeg/VLC/Audacity)
 - **Smart Hotkeys**: Recording activation works from any screen
 - **File Size Fix**: Auto-compress large audio files (>24MB) before upload
 

@@ -359,6 +359,9 @@ public class RecorderForm extends javax.swing.JPanel {
 
     /**
      * Sets up drag and drop support for audio files.
+     * Supported formats: WAV, MP3, M4A, FLAC
+     * Note: OGG files are accepted but conversion may fail due to Java codec limitations.
+     *       Users should convert OGG to WAV manually using ffmpeg, VLC, or Audacity.
      */
     private void setupDragAndDrop(JPanel panel) {
         panel.setTransferHandler(new TransferHandler() {
@@ -385,6 +388,7 @@ public class RecorderForm extends javax.swing.JPanel {
                         String fileName = file.getName().toLowerCase();
 
                         // Accept WAV, MP3, OGG, M4A, FLAC files
+                        // Note: OGG may fail conversion due to Java codec limitations
                         if (fileName.endsWith(".wav") || fileName.endsWith(".mp3") ||
                             fileName.endsWith(".ogg") || fileName.endsWith(".m4a") ||
                             fileName.endsWith(".flac")) {
