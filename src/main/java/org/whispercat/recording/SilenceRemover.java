@@ -169,9 +169,10 @@ public class SilenceRemover {
             console.logSuccess("Silence removed: " + compressedFile.getName());
             console.log(String.format("Silence removal took %dms", elapsedTime));
 
-            // Delete compressed file after use if configured
+            // Schedule deletion if configured (will be deleted after transcription)
             if (!keepCompressed) {
-                compressedFile.deleteOnExit();
+                compressedFile.deleteOnExit();  // Safety net if immediate deletion fails
+                console.log("Compressed file will be deleted after transcription");
             }
 
             return compressedFile;

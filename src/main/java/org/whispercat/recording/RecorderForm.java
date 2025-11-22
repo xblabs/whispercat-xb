@@ -785,18 +785,25 @@ public class RecorderForm extends javax.swing.JPanel {
         @Override
         protected String doInBackground() {
             ConsoleLogger console = ConsoleLogger.getInstance();
+            File fileToTranscribe = audioFile;
+            boolean isCompressedFile = false;
+
             try {
                 // Apply silence removal if enabled
-                File fileToTranscribe = audioFile;
                 if (configManager.isSilenceRemovalEnabled()) {
                     console.separator();
-                    fileToTranscribe = SilenceRemover.removeSilence(
+                    File compressedFile = SilenceRemover.removeSilence(
                         audioFile,
                         configManager.getSilenceThreshold(),
                         configManager.getMinSilenceDuration(),
                         configManager.isKeepCompressedFile(),
                         configManager.getMinRecordingDurationForSilenceRemoval()
                     );
+                    // Track if we got a different file (compressed version)
+                    if (compressedFile != audioFile) {
+                        fileToTranscribe = compressedFile;
+                        isCompressedFile = true;
+                    }
                 }
 
                 String server = configManager.getWhisperServer();
@@ -826,6 +833,16 @@ public class RecorderForm extends javax.swing.JPanel {
 
                 long transcriptionTime = System.currentTimeMillis() - transcriptionStartTime;
                 console.log(String.format("Transcription took %dms", transcriptionTime));
+
+                // Delete compressed file if configured to not keep it
+                if (isCompressedFile && !configManager.isKeepCompressedFile()) {
+                    if (fileToTranscribe.delete()) {
+                        console.log("Deleted compressed file: " + fileToTranscribe.getName());
+                    } else {
+                        logger.warn("Failed to delete compressed file: " + fileToTranscribe.getAbsolutePath());
+                    }
+                }
+
                 return result;
             } catch (Exception e) {
                 logger.error("Error during transcription", e);
