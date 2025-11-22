@@ -433,10 +433,76 @@ public class RecorderForm extends javax.swing.JPanel {
     }
 
     /**
-     * Converts an OGG file to WAV format using javax.sound.sampled.
-     * Note: This is a basic conversion. For better OGG support, consider adding a library like jorbis.
+     * Converts an OGG file to WAV format using ffmpeg.
+     * Falls back to AudioSystem if ffmpeg is not available.
      */
     private File convertOggToWav(File oggFile) {
+        // Try ffmpeg first (much more reliable for OGG files)
+        File wavFile = convertOggToWavUsingFfmpeg(oggFile);
+        if (wavFile != null) {
+            return wavFile;
+        }
+
+        // Fall back to AudioSystem (may not work well)
+        logger.warn("ffmpeg conversion failed or not available. Falling back to AudioSystem.");
+        return convertOggToWavUsingAudioSystem(oggFile);
+    }
+
+    /**
+     * Converts an OGG file to WAV format using ffmpeg.
+     * This is the preferred method as it handles OGG files properly.
+     */
+    private File convertOggToWavUsingFfmpeg(File oggFile) {
+        try {
+            logger.info("Converting OGG file to WAV using ffmpeg in background...");
+
+            // Create temporary WAV file
+            File wavFile = File.createTempFile("whispercat_converted_", ".wav");
+            wavFile.deleteOnExit();
+
+            // Use ffmpeg to convert OGG to WAV
+            ProcessBuilder pb = new ProcessBuilder(
+                "ffmpeg",
+                "-y",
+                "-i", oggFile.getAbsolutePath(),
+                "-acodec", "pcm_s16le",
+                "-ar", "16000",
+                "-ac", "1",
+                wavFile.getAbsolutePath()
+            );
+
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            // Read output to prevent blocking
+            StringBuilder output = new StringBuilder();
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+
+            int exitCode = process.waitFor();
+            if (exitCode == 0 && wavFile.exists() && wavFile.length() > 0) {
+                logger.info("Successfully converted OGG to WAV using ffmpeg");
+                return wavFile;
+            } else {
+                logger.error("ffmpeg conversion failed with exit code: {}. Output: {}", exitCode, output);
+                return null;
+            }
+        } catch (Exception e) {
+            logger.error("Failed to convert OGG using ffmpeg", e);
+            return null;
+        }
+    }
+
+    /**
+     * Converts an OGG file to WAV format using javax.sound.sampled.
+     * This is a fallback method and may not work well with OGG files.
+     */
+    private File convertOggToWavUsingAudioSystem(File oggFile) {
         try {
             // Create temporary WAV file
             File wavFile = File.createTempFile("whispercat_converted_", ".wav");
@@ -444,18 +510,16 @@ public class RecorderForm extends javax.swing.JPanel {
 
             // Note: javax.sound.sampled doesn't natively support OGG
             // This will attempt to read using AudioSystem but may fail
-            // Users should ideally use external tools or libraries for proper OGG support
             try {
                 AudioInputStream audioStream = AudioSystem.getAudioInputStream(oggFile);
                 javax.sound.sampled.AudioSystem.write(audioStream,
                         javax.sound.sampled.AudioFileFormat.Type.WAVE, wavFile);
                 audioStream.close();
-                logger.info("Successfully converted OGG to WAV");
+                logger.info("Successfully converted OGG to WAV using AudioSystem");
                 return wavFile;
             } catch (Exception e) {
                 logger.error("Failed to convert OGG using AudioSystem. OGG codec may not be installed.", e);
                 // Return null to indicate conversion failed
-                // User will need to manually convert using external tools
                 return null;
             }
         } catch (Exception e) {
