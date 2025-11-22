@@ -106,9 +106,9 @@ public class SilenceRemover {
             console.log(String.format("Silence threshold: %.3f RMS | Min duration: %dms",
                 silenceThresholdRMS, minSilenceDurationMs));
 
-            // Detect silence regions
+            // Detect silence regions (with diagnostic logging)
             List<SilenceRegion> silences = detectSilence(audioData, format,
-                silenceThresholdRMS, minSilenceDurationMs);
+                silenceThresholdRMS, minSilenceDurationMs, console);
 
             if (silences.isEmpty()) {
                 console.log("No significant silence detected");
@@ -188,7 +188,8 @@ public class SilenceRemover {
      * Detects silence regions in audio data using RMS amplitude analysis.
      */
     private static List<SilenceRegion> detectSilence(byte[] audioData, AudioFormat format,
-                                                     float silenceThresholdRMS, int minSilenceDurationMs) {
+                                                     float silenceThresholdRMS, int minSilenceDurationMs,
+                                                     ConsoleLogger console) {
         List<SilenceRegion> silences = new ArrayList<>();
 
         float sampleRate = format.getSampleRate();
@@ -205,12 +206,24 @@ public class SilenceRemover {
 
         long silenceStartFrame = -1;
 
+        // Track RMS values for diagnostics
+        float minRMS = Float.MAX_VALUE;
+        float maxRMS = 0.0f;
+        float sumRMS = 0.0f;
+        int windowCount = 0;
+
         // Analyze audio in windows
         for (int offset = 0; offset < audioData.length; offset += windowBytes) {
             int length = Math.min(windowBytes, audioData.length - offset);
 
             // Calculate RMS for this window
             float rms = calculateRMS(audioData, offset, length, sampleSizeInBytes, isBigEndian);
+
+            // Track statistics
+            windowCount++;
+            minRMS = Math.min(minRMS, rms);
+            maxRMS = Math.max(maxRMS, rms);
+            sumRMS += rms;
 
             long currentFrame = offset / frameSize;
 
@@ -239,6 +252,17 @@ public class SilenceRemover {
             if (silenceDuration >= minSilenceFrames) {
                 silences.add(new SilenceRegion(silenceStartFrame, endFrame));
             }
+        }
+
+        // Log RMS diagnostics to help debug silence detection issues
+        float avgRMS = windowCount > 0 ? sumRMS / windowCount : 0.0f;
+        console.log(String.format("Audio RMS analysis: min=%.4f, max=%.4f, avg=%.4f (threshold=%.3f)",
+            minRMS, maxRMS, avgRMS, silenceThresholdRMS));
+
+        if (maxRMS < silenceThresholdRMS) {
+            console.log("⚠ Audio appears to be too quiet - all RMS values below threshold!");
+            console.log("  This could indicate: low microphone gain, quiet voice, or background noise issue");
+            console.log("  Try: increasing microphone volume or reducing silence threshold");
         }
 
         return silences;
