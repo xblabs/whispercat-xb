@@ -2,6 +2,7 @@ mod app;
 mod audio;
 mod config;
 mod error;
+mod hotkey;
 mod pipeline;
 mod transcription;
 mod ui;

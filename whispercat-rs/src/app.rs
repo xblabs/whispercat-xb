@@ -1,5 +1,6 @@
 use crate::audio::{AudioBuffer, AudioRecorder, SilenceRemover};
 use crate::config::Config;
+use crate::hotkey::HotkeyManager;
 use crate::pipeline::{ExecutionResult, Pipeline, PipelineExecutor};
 use crate::transcription::{TranscriptionClient, TranscriptionProvider, TranscriptionRequest};
 use crate::ui::{RecordingAction, RecordingScreen, SettingsAction, SettingsScreen};
@@ -30,6 +31,9 @@ pub struct App {
 
     // Pipeline state
     pipeline_executor: Option<PipelineExecutor>,
+
+    // Global hotkeys
+    hotkey_manager: Option<HotkeyManager>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -63,6 +67,20 @@ impl App {
             None
         };
 
+        // Initialize hotkey manager
+        let mut hotkey_manager = HotkeyManager::new().ok();
+        if let Some(ref mut manager) = hotkey_manager {
+            match manager.register_record_toggle(&config.hotkeys.record_toggle) {
+                Ok(()) => {
+                    tracing::info!("Global hotkey registered: {}", config.hotkeys.record_toggle);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to register hotkey: {}", e);
+                    hotkey_manager = None;
+                }
+            }
+        }
+
         Self {
             current_screen: Screen::Recording,
             recorder: None,
@@ -74,6 +92,7 @@ impl App {
             message_tx: tx,
             execution_log: Vec::new(),
             pipeline_executor,
+            hotkey_manager,
         }
     }
 
@@ -343,6 +362,18 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Process background messages
         self.process_messages();
+
+        // Check for global hotkey events
+        if let Some(ref hotkey_manager) = self.hotkey_manager {
+            if hotkey_manager.check_events() {
+                // Toggle recording on hotkey press
+                if self.recording_screen.is_recording {
+                    self.stop_recording();
+                } else if !self.recording_screen.is_transcribing {
+                    self.start_recording();
+                }
+            }
+        }
 
         // Top panel with navigation
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
