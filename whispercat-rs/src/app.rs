@@ -150,10 +150,12 @@ impl App {
                 }
             };
 
-            // Step 2: Remove silence if enabled
-            if silence_config.enabled {
+            // Step 2: Conditional silence removal (only for longer recordings)
+            let recording_duration_sec = audio.duration().as_secs();
+
+            if silence_config.enabled && recording_duration_sec >= silence_config.min_recording_duration_sec as u64 {
                 tx.send(AppMessage::Log {
-                    message: "Removing silence...".to_string(),
+                    message: format!("Recording duration: {:.1}s - applying silence removal...", recording_duration_sec),
                 })
                 .ok();
 
@@ -188,6 +190,15 @@ impl App {
                         return;
                     }
                 }
+            } else if silence_config.enabled {
+                tx.send(AppMessage::Log {
+                    message: format!(
+                        "⚠ Recording too short ({:.1}s < {}s) - skipping silence removal",
+                        recording_duration_sec,
+                        silence_config.min_recording_duration_sec
+                    ),
+                })
+                .ok();
             }
 
             // Step 3: Transcribe

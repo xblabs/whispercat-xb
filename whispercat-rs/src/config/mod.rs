@@ -99,6 +99,7 @@ pub struct SilenceRemovalConfig {
     pub enabled: bool,
     pub threshold: f32,
     pub min_duration_ms: u32,
+    /// Only apply silence removal if recording is longer than this (in seconds)
     pub min_recording_duration_sec: u32,
 }
 
@@ -108,7 +109,7 @@ impl Default for SilenceRemovalConfig {
             enabled: true,
             threshold: 0.01,
             min_duration_ms: 1500,
-            min_recording_duration_sec: 10,
+            min_recording_duration_sec: 10, // Only remove silence for recordings >= 10 seconds
         }
     }
 }

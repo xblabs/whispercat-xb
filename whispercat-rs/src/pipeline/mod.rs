@@ -71,20 +71,36 @@ impl Unit {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum Provider {
     OpenAI,
 }
 
+/// A batch of units that can potentially be optimized into a single API call
+#[derive(Clone, Debug)]
+struct UnitBatch {
+    units: Vec<Unit>,
+    optimizable: bool,
+    provider: Option<Provider>,
+    model: Option<String>,
+}
+
 pub struct PipelineExecutor {
     openai_client: WhisperClient,
+    optimization_enabled: bool,
 }
 
 impl PipelineExecutor {
     pub fn new(openai_api_key: String) -> Self {
         Self {
             openai_client: WhisperClient::new(openai_api_key),
+            optimization_enabled: true,
         }
+    }
+
+    pub fn with_optimization(mut self, enabled: bool) -> Self {
+        self.optimization_enabled = enabled;
+        self
     }
 
     pub async fn execute(&self, input: String, pipeline: &Pipeline) -> Result<ExecutionResult> {
@@ -94,22 +110,54 @@ impl PipelineExecutor {
 
         tracing::info!("Executing pipeline: {} ({} units)", pipeline.name, pipeline.units.len());
 
-        for (idx, unit) in pipeline.units.iter().enumerate() {
-            let unit_start = Instant::now();
-            tracing::info!("  [{}/{}] {}", idx + 1, pipeline.units.len(), unit.name());
+        // Group units into optimizable batches
+        let batches = if self.optimization_enabled {
+            self.create_batches(&pipeline.units)
+        } else {
+            // No optimization: each unit is its own batch
+            pipeline.units.iter().map(|u| UnitBatch {
+                units: vec![u.clone()],
+                optimizable: false,
+                provider: None,
+                model: None,
+            }).collect()
+        };
 
-            let output = self.execute_unit(&current_text, unit).await?;
-            let duration = unit_start.elapsed();
+        let total_batches = batches.len();
 
-            log_entries.push(ExecutionLogEntry {
-                timestamp: Utc::now(),
-                unit_name: unit.name().to_string(),
-                input: current_text.clone(),
-                output: output.clone(),
-                duration,
-            });
+        for (batch_idx, batch) in batches.iter().enumerate() {
+            let batch_start = Instant::now();
 
-            current_text = output;
+            if batch.optimizable {
+                // Optimized execution: chain prompts into single API call
+                current_text = self.execute_batch_optimized(
+                    &current_text,
+                    batch,
+                    batch_idx + 1,
+                    total_batches,
+                    &mut log_entries,
+                ).await?;
+            } else {
+                // Normal execution: run units individually
+                for unit in &batch.units {
+                    let unit_start = Instant::now();
+                    tracing::info!("  [{}/{}] {}", batch_idx + 1, total_batches, unit.name());
+
+                    let output = self.execute_unit(&current_text, unit).await?;
+                    let duration = unit_start.elapsed();
+
+                    log_entries.push(ExecutionLogEntry {
+                        timestamp: Utc::now(),
+                        unit_name: unit.name().to_string(),
+                        input: current_text.clone(),
+                        output: output.clone(),
+                        duration,
+                        optimized: false,
+                    });
+
+                    current_text = output;
+                }
+            }
         }
 
         let total_duration = start_time.elapsed();
@@ -120,6 +168,170 @@ impl PipelineExecutor {
             log_entries,
             total_duration,
         })
+    }
+
+    /// Groups consecutive same-model prompt units into optimizable batches
+    fn create_batches(&self, units: &[Unit]) -> Vec<UnitBatch> {
+        let mut batches = Vec::new();
+        let mut current_batch: Vec<Unit> = Vec::new();
+        let mut current_provider: Option<Provider> = None;
+        let mut current_model: Option<String> = None;
+
+        for unit in units {
+            match unit {
+                Unit::Prompt { provider, model, .. } => {
+                    // Check if this unit can be added to current batch
+                    if let (Some(batch_provider), Some(batch_model)) = (&current_provider, &current_model) {
+                        if provider == batch_provider && model == batch_model {
+                            // Same provider/model: add to batch
+                            current_batch.push(unit.clone());
+                        } else {
+                            // Different provider/model: finalize current batch and start new one
+                            if !current_batch.is_empty() {
+                                batches.push(UnitBatch {
+                                    units: current_batch.clone(),
+                                    optimizable: current_batch.len() >= 2,
+                                    provider: current_provider.clone(),
+                                    model: current_model.clone(),
+                                });
+                            }
+                            current_batch = vec![unit.clone()];
+                            current_provider = Some(provider.clone());
+                            current_model = Some(model.clone());
+                        }
+                    } else {
+                        // First unit in batch
+                        current_batch.push(unit.clone());
+                        current_provider = Some(provider.clone());
+                        current_model = Some(model.clone());
+                    }
+                }
+                Unit::TextReplacement { .. } => {
+                    // Text replacement: finalize current batch
+                    if !current_batch.is_empty() {
+                        batches.push(UnitBatch {
+                            units: current_batch.clone(),
+                            optimizable: current_batch.len() >= 2,
+                            provider: current_provider.clone(),
+                            model: current_model.clone(),
+                        });
+                        current_batch.clear();
+                        current_provider = None;
+                        current_model = None;
+                    }
+                    // Add text replacement as its own batch
+                    batches.push(UnitBatch {
+                        units: vec![unit.clone()],
+                        optimizable: false,
+                        provider: None,
+                        model: None,
+                    });
+                }
+            }
+        }
+
+        // Finalize last batch
+        if !current_batch.is_empty() {
+            batches.push(UnitBatch {
+                units: current_batch,
+                optimizable: current_provider.is_some() && current_model.is_some(),
+                provider: current_provider,
+                model: current_model,
+            });
+        }
+
+        batches
+    }
+
+    /// Executes an optimized batch by chaining prompts into a single API call
+    async fn execute_batch_optimized(
+        &self,
+        input: &str,
+        batch: &UnitBatch,
+        batch_number: usize,
+        total_batches: usize,
+        log_entries: &mut Vec<ExecutionLogEntry>,
+    ) -> Result<String> {
+        let batch_start = Instant::now();
+        let saved_calls = batch.units.len() - 1;
+        let cost_reduction = (saved_calls * 100) / batch.units.len();
+
+        tracing::info!("⚡ PIPELINE OPTIMIZATION ACTIVE");
+        tracing::info!("  Merging {} consecutive {:?}/{} units",
+            batch.units.len(),
+            batch.provider,
+            batch.model.as_ref().unwrap_or(&"unknown".to_string())
+        );
+        tracing::info!("  Benefit: {} API call{} saved, {}% cost reduction",
+            saved_calls,
+            if saved_calls > 1 { "s" } else { "" },
+            cost_reduction
+        );
+
+        // Compile chained prompt
+        let (system_prompt, user_prompt) = self.compile_chained_prompt(input, batch);
+
+        tracing::info!("  Compiled system prompt: {} chars", system_prompt.len());
+        tracing::info!("  Compiled user prompt: {} chars", user_prompt.len());
+
+        // Execute single API call
+        let model = batch.model.as_ref().unwrap();
+        let output = self.openai_client
+            .chat_completion(&system_prompt, &user_prompt, model)
+            .await?;
+
+        let duration = batch_start.elapsed();
+
+        // Log as optimized execution
+        log_entries.push(ExecutionLogEntry {
+            timestamp: Utc::now(),
+            unit_name: format!("OPTIMIZED CHAIN ({} units)", batch.units.len()),
+            input: input.to_string(),
+            output: output.clone(),
+            duration,
+            optimized: true,
+        });
+
+        tracing::info!("✓ Optimized chain completed - {} API call{} saved!",
+            saved_calls,
+            if saved_calls > 1 { "s" } else { "" }
+        );
+
+        Ok(output)
+    }
+
+    /// Compiles multiple prompts into a single chained prompt
+    fn compile_chained_prompt(&self, input: &str, batch: &UnitBatch) -> (String, String) {
+        let mut system_parts = Vec::new();
+        let mut user_parts = Vec::new();
+
+        for (idx, unit) in batch.units.iter().enumerate() {
+            if let Unit::Prompt { name, system_prompt, user_prompt_template, .. } = unit {
+                // Add system prompt part
+                system_parts.push(format!("## Step {}: {}\n{}", idx + 1, name, system_prompt));
+
+                // Replace {{input}} with placeholder for chaining
+                let step_user_prompt = if idx == 0 {
+                    user_prompt_template.replace("{{input}}", input)
+                } else {
+                    user_prompt_template.replace("{{input}}", &format!("{{STEP_{}_OUTPUT}}", idx))
+                };
+
+                user_parts.push(format!("### Step {}: {}\n{}", idx + 1, name, step_user_prompt));
+            }
+        }
+
+        let system_prompt = format!(
+            "You are executing a chained processing pipeline. Process each step sequentially, using the output from each step as input to the next.\n\n{}",
+            system_parts.join("\n\n")
+        );
+
+        let user_prompt = format!(
+            "Execute the following steps in order:\n\n{}\n\nProvide ONLY the final output from the last step.",
+            user_parts.join("\n\n")
+        );
+
+        (system_prompt, user_prompt)
     }
 
     async fn execute_unit(&self, input: &str, unit: &Unit) -> Result<String> {
@@ -180,4 +392,5 @@ pub struct ExecutionLogEntry {
     pub input: String,
     pub output: String,
     pub duration: std::time::Duration,
+    pub optimized: bool,
 }
