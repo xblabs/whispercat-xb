@@ -303,6 +303,14 @@ public class RecorderForm extends javax.swing.JPanel {
         consoleScrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
         consolePanel.add(consoleScrollPane, BorderLayout.CENTER);
 
+        // Add clear button for console log
+        JPanel consoleButtonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 2));
+        JButton clearLogButton = new JButton("Clear Log");
+        clearLogButton.setToolTipText("Clear the execution log");
+        clearLogButton.addActionListener(e -> consoleLogArea.setText(""));
+        consoleButtonPanel.add(clearLogButton);
+        consolePanel.add(consoleButtonPanel, BorderLayout.SOUTH);
+
         // Register console with ConsoleLogger singleton
         ConsoleLogger.getInstance().setConsoleArea(consoleLogArea);
 
