@@ -230,14 +230,14 @@ public class SettingsForm extends JPanel {
         gbc.anchor = GridBagConstraints.WEST;
         contentPanel.add(bitrateComboBox, gbc);
 
-        // Row: Enable Stop Sound
+        // Row: Enable Finish Sound
         row++;
         gbc.gridx = 0;
         gbc.gridy = row;
         gbc.gridwidth = 1;
         gbc.weightx = 0;
         gbc.anchor = GridBagConstraints.EAST;
-        contentPanel.add(new JLabel("Enable Stop Sound:"), gbc);
+        contentPanel.add(new JLabel("Enable Finish Sound:"), gbc);
         stopSoundSwitch = new JCheckBox();
         gbc.gridx = 1;
         gbc.gridy = row;
@@ -998,9 +998,9 @@ public class SettingsForm extends JPanel {
         microphoneComboBox.setSelectedItem(selectedMicrophone);
         int bitrate = configManager.getAudioBitrate();
         bitrateComboBox.setSelectedItem(bitrate);
-        String stopSound = configManager.getProperty("stopSound");
-        boolean isStopSoundEnabled = Boolean.parseBoolean(stopSound);
-        stopSoundSwitch.setSelected(isStopSoundEnabled);
+        String finishSound = configManager.getProperty("finishSound");
+        boolean isFinishSoundEnabled = Boolean.parseBoolean(finishSound);
+        stopSoundSwitch.setSelected(isFinishSoundEnabled);
         // Load Whisper Server selection settings
         String whisperServer = configManager.getProperty("whisperServer");
         if (whisperServer != null && !whisperServer.isEmpty()) {
@@ -1061,8 +1061,8 @@ public class SettingsForm extends JPanel {
         configManager.setProperty("selectedMicrophone", (String) microphoneComboBox.getSelectedItem());
         int selectedBitrate = (Integer) bitrateComboBox.getSelectedItem();
         configManager.setAudioBitrate(selectedBitrate);
-        boolean isStopSoundEnabled = stopSoundSwitch.isSelected();
-        configManager.setProperty("stopSound", String.valueOf(isStopSoundEnabled));
+        boolean isFinishSoundEnabled = stopSoundSwitch.isSelected();
+        configManager.setProperty("finishSound", String.valueOf(isFinishSoundEnabled));
         // Save Whisper Server selection and Faster-Whisperer settings
         String selectedWhisperServer = (String) whisperServerComboBox.getSelectedItem();
         configManager.setProperty("whisperServer", selectedWhisperServer);

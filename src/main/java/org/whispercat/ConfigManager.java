@@ -134,8 +134,8 @@ public class ConfigManager {
         return properties.getProperty("selectedMicrophone");
     }
 
-    public boolean isStopSoundEnabled() {
-        return Boolean.parseBoolean(properties.getProperty("stopSound", "true"));
+    public boolean isFinishSoundEnabled() {
+        return Boolean.parseBoolean(properties.getProperty("finishSound", "true"));
     }
 
 

@@ -663,8 +663,8 @@ public class RecorderForm extends javax.swing.JPanel {
         new RecorderForm.AudioTranscriptionWorker(audioFile).execute();
     }
 
-    public void playClickSound() {
-        if (configManager.isStopSoundEnabled()) {
+    public void playFinishSound() {
+        if (configManager.isFinishSoundEnabled()) {
             new Thread(() -> {
                 try {
                     InputStream audioSrc = getClass().getResourceAsStream("/stop.wav");
@@ -884,7 +884,7 @@ public class RecorderForm extends javax.swing.JPanel {
                             if (trayManager != null) {
                                 trayManager.showSystemNotification("WhisperCat", "Post-processing completed");
                             }
-                            playClickSound();
+                            playFinishSound();
                             // Remove focus from text areas to prevent pasting into them
                             transcriptionTextArea.transferFocus();
                             RecorderForm.this.processedText.transferFocus();
@@ -907,7 +907,7 @@ public class RecorderForm extends javax.swing.JPanel {
                     copyTranscriptionToClipboard(transcript);
                     pasteFromClipboard();
                 }
-                playClickSound();
+                playFinishSound();
                 updateTrayMenu();
             }
 
