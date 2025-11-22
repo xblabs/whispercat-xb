@@ -47,11 +47,19 @@ This is an enhanced fork by [xblabs](https://github.com/xblabs) with significant
 - **Configurable Post-Processing Models** - Add any OpenAI model (GPT-5 nano, mini, etc.) via GUI settings
 - **Drag & Drop Audio Files** - Drop WAV, MP3, OGG, M4A, FLAC files directly into the app for transcription
 - **OGG File Support** - Automatic conversion of Telegram voice notes and other OGG files
-- **Smart Recording Activation** - Hotkey automatically switches to recorder screen from any menu
+- **Smart Recording Activation** - Hotkey automatically switches to recorder screen from any menu and **auto-saves settings** when triggered from Options screen
 - **Sorted Lists** - Alphabetically organized pipelines and units for easy navigation
-- **Large File Support** - Automatic audio compression for files exceeding OpenAI's 25MB limit
+- **Advanced Large File Support** - **MP3 compression (10x+ reduction)** using ffmpeg for files exceeding 24MB, extends max recording length from 10 to 100+ minutes
 
 💡 **Intelligent Audio Processing:**
+- **MP3 Compression for Large Files** (NEW 🎵) - When recordings exceed OpenAI's 24MB limit:
+  - Automatically converts to MP3 using ffmpeg with optimized speech settings
+  - **10x+ compression ratio** (24MB WAV → 2-3MB MP3) vs 2-3x with old downsampling method
+  - **Extends max recording length from ~10 minutes to 100+ minutes**
+  - Uses VBR quality 4 (~140kbps), mono, 16kHz sample rate for excellent speech quality
+  - Supports all OpenAI formats: MP3, M4A, OGG, FLAC, WAV with automatic content-type detection
+  - Falls back to legacy downsampling if ffmpeg unavailable
+  - Transparent - works automatically, no user configuration needed
 - **Automatic Silence Removal** - RMS-based silence detection removes pauses/silence before transcription
   - Reduces file size by 20-40% for typical recordings with reading/thinking pauses
   - Lowers transcription costs (less audio = fewer tokens)
@@ -68,6 +76,23 @@ This is an enhanced fork by [xblabs](https://github.com/xblabs) with significant
 ### xblabs Fork Changelog
 
 #### Latest Update (2025-11-22)
+- **MP3 Compression for Large Files** 🎵:
+  - Automatic MP3 compression using ffmpeg when files exceed 24MB
+  - **10x+ compression ratio** vs WAV format (24MB WAV → 2-3MB MP3)
+  - **Extends maximum recording length from ~10 minutes to 100+ minutes** for OpenAI transcription
+  - Uses optimized settings for speech: VBR quality 4 (~140kbps), mono, 16kHz sample rate
+  - Falls back to downsampling if ffmpeg is unavailable
+  - Supports all OpenAI-compatible formats: MP3, M4A, OGG, FLAC, WAV
+- **Robust Error Handling & Timeouts** ⏱️:
+  - Fixed JsonParseException when OpenAI returns non-JSON error responses
+  - Added 10-minute socket timeout to prevent indefinite hanging on large file uploads
+  - Enhanced error logging with response truncation for better debugging
+  - Graceful handling of network timeouts and API errors
+- **Recording Hotkey from Options Screen** ⚙️:
+  - Recording hotkey now works from Options/Settings screen
+  - **Auto-saves all settings** before switching to recording screen
+  - Prevents bad UX where users talk without feedback
+  - Hotkey only disabled when actively configuring keybind fields (has focus)
 - **Critical UI State Persistence Fixes** 🔧:
   - Recording no longer stops when switching screens (continues in background)
   - Transcription text persists when navigating between Record/Options screens
@@ -165,6 +190,43 @@ Here's what WhisperCat looks like in action:
 
 1. Visit the **[Releases Page](https://github.com/ddxy/whispercat/releases)** for the WhisperCat project.
 2. Download the latest version for your operating system and follow the setup instructions.
+
+### Optional: ffmpeg for MP3 Compression
+
+To enable **MP3 compression** for large audio files (recommended for recordings >10 minutes):
+
+**Windows:**
+1. Download ffmpeg from [ffmpeg.org/download.html](https://ffmpeg.org/download.html) or use [Chocolatey](https://chocolatey.org/): `choco install ffmpeg`
+2. Add ffmpeg to your system PATH
+
+**Linux:**
+```sh
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+
+# Fedora/RHEL
+sudo dnf install ffmpeg
+
+# Arch Linux
+sudo pacman -S ffmpeg
+```
+
+**macOS:**
+```sh
+# Using Homebrew
+brew install ffmpeg
+```
+
+**Verify installation:**
+```sh
+ffmpeg -version
+```
+
+**Benefits of ffmpeg:**
+- **10x+ better compression** than fallback method (2-3MB vs 24MB)
+- **100+ minute recordings** instead of ~10 minutes for OpenAI transcription
+- Automatic MP3 conversion with optimized speech settings
+- Works transparently - if not installed, app falls back to legacy downsampling
 
 ---
 
