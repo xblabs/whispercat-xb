@@ -271,8 +271,13 @@ public class RecorderForm extends javax.swing.JPanel {
         postProcessingContainerPanel.add(Box.createVerticalStrut(10));
         postProcessingContainerPanel.add(copyButtonPanel);
 
+        // Load saved state for post-processing checkbox
+        enablePostProcessingCheckBox.setSelected(configManager.isPostProcessingEnabled());
+
         enablePostProcessingCheckBox.addActionListener(e -> {
             boolean selected = enablePostProcessingCheckBox.isSelected();
+            // Save state when changed
+            configManager.setPostProcessingEnabled(selected);
             if (selected) {
                 cl.show(cardPanel, "active");
             } else {
@@ -286,9 +291,20 @@ public class RecorderForm extends javax.swing.JPanel {
             postProcessingContainerPanel.repaint();
         });
 
+        // Trigger initial UI setup based on loaded state
+        if (enablePostProcessingCheckBox.isSelected()) {
+            cl.show(cardPanel, "active");
+            additionalTextLabel.setVisible(true);
+            loadOnStartupCheckBox.setVisible(true);
+            processedTextScrollPane.setVisible(true);
+            copyButtonPanel.setVisible(true);
+        }
+
         if (configManager.isPostProcessingOnStartup()) {
             loadOnStartupCheckBox.setSelected(true);
-            enablePostProcessingCheckBox.doClick();
+            if (!enablePostProcessingCheckBox.isSelected()) {
+                enablePostProcessingCheckBox.doClick();
+            }
         }
 
         // Console log panel
@@ -745,11 +761,12 @@ public class RecorderForm extends javax.swing.JPanel {
                 logger.error("An error occurred while finishing the transcription", e);
                 console.logError("Error finishing transcription: " + e.getMessage());
             } finally {
-                resetUIAfterTranscription();
                 isRecording = false;
-                // Only run post-processing if we have a valid transcript
-                if (transcript != null && !transcript.trim().isEmpty() &&
-                    enablePostProcessingCheckBox.isSelected() && postProcessingSelectComboBox.getSelectedItem() != null) {
+            }
+
+            // Only run post-processing if we have a valid transcript
+            if (transcript != null && !transcript.trim().isEmpty() &&
+                enablePostProcessingCheckBox.isSelected() && postProcessingSelectComboBox.getSelectedItem() != null) {
                     PostProcessingItem selectedItem = (PostProcessingItem) postProcessingSelectComboBox.getSelectedItem();
                     if (selectedItem != null && selectedItem.uuid != null) {
                         Pipeline pipeline = configManager.getPipelineByUuid(selectedItem.uuid);
@@ -777,16 +794,18 @@ public class RecorderForm extends javax.swing.JPanel {
                             updateTrayMenu();
                         }
                     }
-                } else {
-                    playClickSound();
+            } else if (transcript != null && !transcript.trim().isEmpty()) {
+                // No post-processing, just copy raw transcript if auto-paste enabled
+                if (configManager.isAutoPasteEnabled()) {
                     copyTranscriptionToClipboard(transcript);
                     pasteFromClipboard();
-                    updateTrayMenu();
-
-
                 }
-
+                playClickSound();
+                updateTrayMenu();
             }
+
+            // Reset UI after everything is done (keeps blue circle during post-processing)
+            resetUIAfterTranscription();
         }
     }
 }

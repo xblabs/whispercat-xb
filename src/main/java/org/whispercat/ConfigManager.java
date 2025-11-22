@@ -312,6 +312,15 @@ public class ConfigManager {
         saveConfig();
     }
 
+    public boolean isPostProcessingEnabled() {
+        return Boolean.parseBoolean(properties.getProperty("postProcessingEnabled", "true"));
+    }
+
+    public void setPostProcessingEnabled(boolean enabled) {
+        properties.setProperty("postProcessingEnabled", String.valueOf(enabled));
+        saveConfig();
+    }
+
     // openwebUIApiKey
     public String getOpenWebUIApiKey() {
         return properties.getProperty("openWebUIApiKey", "");
