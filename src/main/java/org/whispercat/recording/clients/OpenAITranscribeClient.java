@@ -3,6 +3,7 @@ package org.whispercat.recording.clients;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.HttpEntity;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
@@ -23,6 +24,8 @@ public class OpenAITranscribeClient {
     private static final Logger logger = LogManager.getLogger(OpenAITranscribeClient.class);
     private static final String API_URL = "https://api.openai.com/v1/audio/transcriptions";
     private static final long MAX_FILE_SIZE = 24 * 1024 * 1024; // 24 MB (leaving buffer under 25MB limit)
+    private static final int CONNECTION_TIMEOUT = 30000; // 30 seconds
+    private static final int SOCKET_TIMEOUT = 600000; // 10 minutes for large file processing
     private final ConfigManager configManager;
 
     public OpenAITranscribeClient(ConfigManager configManager) {
@@ -89,7 +92,17 @@ public class OpenAITranscribeClient {
                 audioFile.length() / (1024.0 * 1024.0));
             fileToTranscribe = compressAudioFile(audioFile);
         }
-        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+
+        // Configure timeouts to prevent indefinite hanging
+        RequestConfig requestConfig = RequestConfig.custom()
+            .setConnectTimeout(CONNECTION_TIMEOUT)
+            .setSocketTimeout(SOCKET_TIMEOUT)
+            .setConnectionRequestTimeout(CONNECTION_TIMEOUT)
+            .build();
+
+        try (CloseableHttpClient httpClient = HttpClients.custom()
+                .setDefaultRequestConfig(requestConfig)
+                .build()) {
             HttpPost httpPost = new HttpPost(API_URL);
             httpPost.setHeader("Authorization", "Bearer " + configManager.getApiKey());
 
@@ -106,16 +119,39 @@ public class OpenAITranscribeClient {
                 String responseString = new String(responseEntity.getContent().readAllBytes(), StandardCharsets.UTF_8);
 
                 if (statusCode != 200) {
-                    ObjectMapper objectMapper = new ObjectMapper();
-                    JsonNode jsonNode = objectMapper.readTree(responseString);
-                    String errorMessage = jsonNode.path("error").path("message").asText();
-                    logger.error("Error from OpenAI API: {}", errorMessage);
-                    throw new IOException("Error from OpenAI API: " + errorMessage);
+                    logger.error("OpenAI API returned status code: {}. Response: {}", statusCode, responseString);
+
+                    // Try to parse as JSON to get error message
+                    try {
+                        ObjectMapper objectMapper = new ObjectMapper();
+                        JsonNode jsonNode = objectMapper.readTree(responseString);
+                        String errorMessage = jsonNode.path("error").path("message").asText("Unknown error");
+                        throw new IOException("Error from OpenAI API (HTTP " + statusCode + "): " + errorMessage);
+                    } catch (Exception jsonException) {
+                        // Response is not valid JSON, use raw response
+                        logger.error("Failed to parse error response as JSON", jsonException);
+                        // Truncate very long responses
+                        String truncatedResponse = responseString.length() > 500
+                            ? responseString.substring(0, 500) + "..."
+                            : responseString;
+                        throw new IOException("Error from OpenAI API (HTTP " + statusCode + "): " + truncatedResponse);
+                    }
                 }
 
-                ObjectMapper objectMapper = new ObjectMapper();
-                JsonNode jsonNode = objectMapper.readTree(responseString);
-                return jsonNode.path("text").asText();
+                // Parse successful response
+                try {
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    JsonNode jsonNode = objectMapper.readTree(responseString);
+                    String transcription = jsonNode.path("text").asText();
+                    if (transcription == null || transcription.isEmpty()) {
+                        logger.warn("OpenAI returned empty transcription");
+                        throw new IOException("OpenAI returned empty transcription");
+                    }
+                    return transcription;
+                } catch (Exception jsonException) {
+                    logger.error("Failed to parse successful response as JSON. Response: {}", responseString, jsonException);
+                    throw new IOException("Failed to parse OpenAI response: " + jsonException.getMessage());
+                }
             }
         }
     }

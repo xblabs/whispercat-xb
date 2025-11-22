@@ -43,13 +43,20 @@ public class GlobalHotkeyListener implements NativeKeyListener {
     @Override
     public void nativeKeyPressed(NativeKeyEvent e) {
         if (optionsDialogOpen) {
-            if (keyCombinationTextField != null) {
-                keyCombinationTextField.processKeyPressed(e);
+            // Only intercept keys if one of the keybind fields has focus
+            boolean fieldHasFocus = (keyCombinationTextField != null && keyCombinationTextField.hasFocus()) ||
+                                    (keySequenceTextField != null && keySequenceTextField.hasFocus());
+
+            if (fieldHasFocus) {
+                if (keyCombinationTextField != null) {
+                    keyCombinationTextField.processKeyPressed(e);
+                }
+                if (keySequenceTextField != null) {
+                    keySequenceTextField.processKeyPressed(e);
+                }
+                return;
             }
-            if (keySequenceTextField != null) {
-                keySequenceTextField.processKeyPressed(e);
-            }
-            return;
+            // If no keybind field has focus, allow normal hotkey processing
         }
         if (pressedKeys.contains(e.getKeyCode())) {
             return;
@@ -63,13 +70,20 @@ public class GlobalHotkeyListener implements NativeKeyListener {
         logger.debug("Key released: {}", e.getKeyCode());
         pressedKeys.remove(e.getKeyCode());
         if (optionsDialogOpen) {
-            if (keyCombinationTextField != null) {
-                keyCombinationTextField.processKeyReleased(e);
+            // Only intercept keys if one of the keybind fields has focus
+            boolean fieldHasFocus = (keyCombinationTextField != null && keyCombinationTextField.hasFocus()) ||
+                                    (keySequenceTextField != null && keySequenceTextField.hasFocus());
+
+            if (fieldHasFocus) {
+                if (keyCombinationTextField != null) {
+                    keyCombinationTextField.processKeyReleased(e);
+                }
+                if (keySequenceTextField != null) {
+                    keySequenceTextField.processKeyReleased(e);
+                }
+                return;
             }
-            if (keySequenceTextField != null) {
-                keySequenceTextField.processKeyReleased(e);
-            }
-            return;
+            // If no keybind field has focus, allow normal hotkey processing
         }
         if (!isKeyCombinationPressed()) {
             combinationActive = false;
