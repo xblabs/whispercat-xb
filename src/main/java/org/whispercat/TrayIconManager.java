@@ -5,8 +5,6 @@ package org.whispercat;
 import dorkbox.systemTray.MenuItem;
 import dorkbox.systemTray.Separator;
 import dorkbox.systemTray.SystemTray;
-import dorkbox.notify.Notify;
-import dorkbox.notify.Pos;
 
 import javax.swing.*;
 import java.awt.*;
@@ -100,17 +98,12 @@ public class TrayIconManager {
     public void showSystemNotification(String title, String message) {
         if (systemTray != null) {
             try {
-                // Show actual notification balloon using dorkbox Notify
-                Notify.create()
-                    .title(title)
-                    .text(message)
-                    .position(Pos.BOTTOM_RIGHT)
-                    .hideAfter(5000) // Auto-hide after 5 seconds
-                    .darkStyle() // Match dark theme
-                    .show();
-
-                // Also update tray status
+                // Update tray status text
                 systemTray.setStatus(message);
+
+                // Show a tooltip notification on the tray icon
+                // Note: The dorkbox SystemTray library doesn't directly support notification balloons,
+                // but the status text will be visible when hovering over the tray icon
 
                 // Log the notification
                 logger.info("System notification: {} - {}", title, message);
