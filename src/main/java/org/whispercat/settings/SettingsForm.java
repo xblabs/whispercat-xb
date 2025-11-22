@@ -28,7 +28,6 @@ public class SettingsForm extends JPanel {
     private final JButton clearKeybindButton;
     private final KeySequenceTextField keySequenceTextField;
     private final JButton clearKeySequenceButton;
-    private final JButton saveButton;
     private final JComboBox<String> microphoneComboBox;
     private final JComboBox<Integer> bitrateComboBox;
     private final ConfigManager configManager;
@@ -745,18 +744,7 @@ public class SettingsForm extends JPanel {
         CardLayout cl = (CardLayout) (whisperSettingsPanel.getLayout());
         cl.show(whisperSettingsPanel, (String) whisperServerComboBox.getSelectedItem());
 
-        // Row: Save Button
-        row++;
-        saveButton = new JButton("Save");
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        buttonPanel.add(saveButton);
-        saveButton.addActionListener(this::saveSettings);
-        gbc.gridx = 0;
-        gbc.gridy = row;
-        gbc.gridwidth = 3;
-        gbc.weightx = 1.0;
-        gbc.anchor = GridBagConstraints.EAST;
-        contentPanel.add(buttonPanel, gbc);
+        // Settings are now auto-saved when leaving the screen - no Save button needed
 
         loadSettings();
 
