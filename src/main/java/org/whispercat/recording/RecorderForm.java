@@ -411,22 +411,41 @@ public class RecorderForm extends javax.swing.JPanel {
      */
     private void handleDroppedAudioFile(File file) {
         logger.info("Dropped file: " + file.getName());
+        ConsoleLogger console = ConsoleLogger.getInstance();
+
+        // Set transcribing state (blue indicator)
+        isTranscribing = true;
+        statusIndicatorPanel.repaint();
+        recordButton.setText("Converting...");
+        recordButton.setEnabled(false);
+
         File fileToTranscribe = file;
 
-        // Check if OGG file and convert to WAV
-        if (file.getName().toLowerCase().endsWith(".ogg")) {
+        // Check if OGG file and convert to WAV (FLAC is natively supported by OpenAI, no conversion needed)
+        String fileName = file.getName().toLowerCase();
+        if (fileName.endsWith(".ogg")) {
             logger.info("Converting OGG file to WAV...");
+            console.log("Converting OGG file to WAV using ffmpeg...");
             Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
                     "Converting OGG to WAV...");
             fileToTranscribe = convertOggToWav(file);
             if (fileToTranscribe == null) {
+                console.logError("Failed to convert OGG file");
                 Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
                         "Failed to convert OGG file. Please convert to WAV manually.");
+                resetUIAfterTranscription();
                 return;
             }
+            console.logSuccess("Successfully converted OGG to WAV");
+        } else if (fileName.endsWith(".flac")) {
+            console.log("FLAC file detected - using directly (no conversion needed)");
         }
 
         // Transcribe the file
+        logger.info("Transcribing audio using " + configManager.getWhisperServer());
+        console.separator();
+        console.log("Starting transcription using " + configManager.getWhisperServer());
+        console.log("Audio file: " + fileToTranscribe.getName());
         Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
                 "Transcribing audio file...");
         new AudioTranscriptionWorker(fileToTranscribe).execute();
@@ -565,6 +584,14 @@ public class RecorderForm extends javax.swing.JPanel {
         if (lastUsedIndex != null) {
             postProcessingSelectComboBox.setSelectedIndex(lastUsedIndex);
         }
+    }
+
+    /**
+     * Refreshes the pipeline dropdown when navigating back to the recorder screen.
+     * Call this when the form becomes visible to ensure new pipelines appear.
+     */
+    public void refreshPipelines() {
+        populatePostProcessingComboBox();
     }
 
     private boolean isToggleInProgress = false;

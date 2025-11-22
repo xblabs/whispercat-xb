@@ -44,6 +44,9 @@ public class OpenAITranscribeClient {
         try {
             logger.info("Compressing audio file to MP3: {} (size: {} MB)",
                 originalFile.getName(), originalFile.length() / (1024.0 * 1024.0));
+            org.whispercat.ConsoleLogger.getInstance().log(String.format(
+                "Compressing audio file to MP3: %s (size: %.2f MB)",
+                originalFile.getName(), originalFile.length() / (1024.0 * 1024.0)));
 
             // Create temporary MP3 file
             File mp3File = File.createTempFile("whispercat_compressed_", ".mp3");
@@ -82,10 +85,14 @@ public class OpenAITranscribeClient {
 
             int exitCode = process.waitFor();
             if (exitCode == 0 && mp3File.exists() && mp3File.length() > 0) {
+                double compressionRatio = (double) originalFile.length() / mp3File.length();
                 logger.info("Successfully compressed to MP3: {} (size: {} MB, compression ratio: {:.1f}x)",
                     mp3File.getName(),
                     mp3File.length() / (1024.0 * 1024.0),
-                    (double) originalFile.length() / mp3File.length());
+                    compressionRatio);
+                org.whispercat.ConsoleLogger.getInstance().logSuccess(String.format(
+                    "Successfully compressed to MP3: %.2f MB (%.1fx compression ratio)",
+                    mp3File.length() / (1024.0 * 1024.0), compressionRatio));
                 return mp3File;
             } else {
                 logger.error("ffmpeg conversion failed with exit code: {}. Output: {}", exitCode, output);
