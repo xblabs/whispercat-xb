@@ -321,6 +321,15 @@ public class ConfigManager {
         saveConfig();
     }
 
+    public int getMinRecordingDurationForSilenceRemoval() {
+        return Integer.parseInt(properties.getProperty("minRecordingDurationForSilenceRemoval", "10"));
+    }
+
+    public void setMinRecordingDurationForSilenceRemoval(int durationSeconds) {
+        properties.setProperty("minRecordingDurationForSilenceRemoval", String.valueOf(durationSeconds));
+        saveConfig();
+    }
+
     // openwebUIApiKey
     public String getOpenWebUIApiKey() {
         return properties.getProperty("openWebUIApiKey", "");

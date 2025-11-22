@@ -45,10 +45,12 @@ public class SilenceRemover {
      * @param silenceThresholdRMS RMS threshold for silence detection (0.0-1.0, typically 0.01 = -40dB)
      * @param minSilenceDurationMs Minimum consecutive duration to consider as silence (milliseconds)
      * @param keepCompressed Whether to keep the compressed file after transcription
+     * @param minRecordingDurationSec Minimum recording duration (seconds) to apply silence removal
      * @return The compressed audio file, or original if no silence detected
      */
     public static File removeSilence(File originalFile, float silenceThresholdRMS,
-                                     int minSilenceDurationMs, boolean keepCompressed) {
+                                     int minSilenceDurationMs, boolean keepCompressed,
+                                     int minRecordingDurationSec) {
         ConsoleLogger console = ConsoleLogger.getInstance();
         long startTime = System.currentTimeMillis();
 
@@ -89,6 +91,14 @@ public class SilenceRemover {
             // Safety check: ensure original audio is long enough
             if (originalDurationSec < 1.0f) {
                 console.log("Original audio too short for silence removal (< 1s), skipping");
+                return originalFile;
+            }
+
+            // Check minimum recording duration threshold
+            if (originalDurationSec < minRecordingDurationSec) {
+                console.log(String.format("Recording duration (%.1fs) below threshold (%ds), skipping silence removal",
+                    originalDurationSec, minRecordingDurationSec));
+                console.log("Use longer recordings for silence removal to avoid unnecessary overhead");
                 return originalFile;
             }
 

@@ -41,6 +41,7 @@ public class SettingsForm extends JPanel {
     private JCheckBox silenceRemovalSwitch;
     private JSlider silenceThresholdSlider;
     private JSlider minSilenceDurationSlider;
+    private JSlider minRecordingDurationSlider;
     private JCheckBox keepCompressedSwitch;
     private AudioFormat format;
     private TargetDataLine line;
@@ -351,6 +352,51 @@ public class SettingsForm extends JPanel {
         durationHint.setFont(new Font("Dialog", Font.PLAIN, 10));
         durationHint.setForeground(Color.GRAY);
         contentPanel.add(durationHint, gbc);
+
+        row++;
+
+        // Minimum recording duration slider
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0;
+        gbc.anchor = GridBagConstraints.EAST;
+        JLabel minRecDurationLabel = new JLabel("Min recording for removal:");
+        contentPanel.add(minRecDurationLabel, gbc);
+
+        JPanel minRecDurationPanel = new JPanel(new BorderLayout(5, 0));
+        minRecordingDurationSlider = new JSlider(0, 60, configManager.getMinRecordingDurationForSilenceRemoval());
+        minRecordingDurationSlider.setMajorTickSpacing(10);
+        minRecordingDurationSlider.setMinorTickSpacing(5);
+        minRecordingDurationSlider.setPaintTicks(true);
+        JLabel minRecDurationValueLabel = new JLabel(configManager.getMinRecordingDurationForSilenceRemoval() + "s");
+        minRecDurationPanel.add(minRecordingDurationSlider, BorderLayout.CENTER);
+        minRecDurationPanel.add(minRecDurationValueLabel, BorderLayout.EAST);
+
+        minRecordingDurationSlider.addChangeListener(e -> {
+            int value = minRecordingDurationSlider.getValue();
+            minRecDurationValueLabel.setText(value + "s");
+        });
+
+        gbc.gridx = 1;
+        gbc.gridy = row;
+        gbc.gridwidth = 2;
+        gbc.weightx = 1.0;
+        gbc.anchor = GridBagConstraints.WEST;
+        contentPanel.add(minRecDurationPanel, gbc);
+
+        row++;
+
+        // Hint for minimum recording duration
+        gbc.gridx = 1;
+        gbc.gridy = row;
+        gbc.gridwidth = 2;
+        gbc.weightx = 1.0;
+        gbc.anchor = GridBagConstraints.WEST;
+        JLabel minRecDurationHint = new JLabel("<html><i>Only apply silence removal to recordings longer than this (0 = always apply)</i></html>");
+        minRecDurationHint.setFont(new Font("Dialog", Font.PLAIN, 10));
+        minRecDurationHint.setForeground(Color.GRAY);
+        contentPanel.add(minRecDurationHint, gbc);
 
         row++;
 
@@ -1024,6 +1070,7 @@ public class SettingsForm extends JPanel {
         configManager.setSilenceRemovalEnabled(silenceRemovalSwitch.isSelected());
         configManager.setSilenceThreshold(silenceThresholdSlider.getValue() / 1000.0f);
         configManager.setMinSilenceDuration(minSilenceDurationSlider.getValue());
+        configManager.setMinRecordingDurationForSilenceRemoval(minRecordingDurationSlider.getValue());
         configManager.setKeepCompressedFile(keepCompressedSwitch.isSelected());
 
         configManager.saveConfig();

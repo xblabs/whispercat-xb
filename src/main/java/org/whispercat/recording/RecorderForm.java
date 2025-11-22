@@ -700,7 +700,8 @@ public class RecorderForm extends javax.swing.JPanel {
                         audioFile,
                         configManager.getSilenceThreshold(),
                         configManager.getMinSilenceDuration(),
-                        configManager.isKeepCompressedFile()
+                        configManager.isKeepCompressedFile(),
+                        configManager.getMinRecordingDurationForSilenceRemoval()
                     );
                 }
 
