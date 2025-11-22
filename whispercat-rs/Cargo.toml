@@ -1,0 +1,45 @@
+[package]
+name = "whispercat"
+version = "0.1.0"
+edition = "2021"
+authors = ["xblabs"]
+description = "WhisperCat Rust PoC - AI-powered audio transcription with post-processing"
+
+[dependencies]
+# UI Framework
+egui = "0.24"
+eframe = { version = "0.24", default-features = true, features = [
+    "default_fonts",
+    "glow",
+    "persistence",
+] }
+
+# Audio
+cpal = "0.15"
+hound = "3.5"
+
+# HTTP & API
+reqwest = { version = "0.11", features = ["json", "multipart"] }
+tokio = { version = "1", features = ["full"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Utilities
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["serde", "v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5"
+regex = "1"
+
+# Platform-specific
+[target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
+global-hotkey = "0.5"
+
+[dev-dependencies]
+criterion = "0.5"
