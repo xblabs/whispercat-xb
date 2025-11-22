@@ -5,6 +5,8 @@ package org.whispercat;
 import dorkbox.systemTray.MenuItem;
 import dorkbox.systemTray.Separator;
 import dorkbox.systemTray.SystemTray;
+import dorkbox.notify.Notify;
+import dorkbox.notify.Pos;
 
 import javax.swing.*;
 import java.awt.*;
@@ -98,7 +100,16 @@ public class TrayIconManager {
     public void showSystemNotification(String title, String message) {
         if (systemTray != null) {
             try {
-                // Use the dorkbox notification system - it's cross-platform
+                // Show actual notification balloon using dorkbox Notify
+                Notify.create()
+                    .title(title)
+                    .text(message)
+                    .position(Pos.BOTTOM_RIGHT)
+                    .hideAfter(5000) // Auto-hide after 5 seconds
+                    .darkStyle() // Match dark theme
+                    .show();
+
+                // Also update tray status
                 systemTray.setStatus(message);
 
                 // Log the notification
