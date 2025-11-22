@@ -297,6 +297,19 @@ public class SettingsForm extends JPanel {
 
         row++;
 
+        // Hint for threshold slider
+        gbc.gridx = 1;
+        gbc.gridy = row;
+        gbc.gridwidth = 2;
+        gbc.weightx = 1.0;
+        gbc.anchor = GridBagConstraints.WEST;
+        JLabel thresholdHint = new JLabel("<html><i>Lower = more aggressive (removes more), Higher = conservative (removes less)</i></html>");
+        thresholdHint.setFont(new Font("Dialog", Font.PLAIN, 10));
+        thresholdHint.setForeground(Color.GRAY);
+        contentPanel.add(thresholdHint, gbc);
+
+        row++;
+
         // Minimum silence duration slider
         gbc.gridx = 0;
         gbc.gridy = row;
@@ -325,6 +338,19 @@ public class SettingsForm extends JPanel {
         gbc.weightx = 1.0;
         gbc.anchor = GridBagConstraints.WEST;
         contentPanel.add(durationPanel, gbc);
+
+        row++;
+
+        // Hint for duration slider
+        gbc.gridx = 1;
+        gbc.gridy = row;
+        gbc.gridwidth = 2;
+        gbc.weightx = 1.0;
+        gbc.anchor = GridBagConstraints.WEST;
+        JLabel durationHint = new JLabel("<html><i>Minimum consecutive silence to remove (higher = more conservative)</i></html>");
+        durationHint.setFont(new Font("Dialog", Font.PLAIN, 10));
+        durationHint.setForeground(Color.GRAY);
+        contentPanel.add(durationHint, gbc);
 
         row++;
 
