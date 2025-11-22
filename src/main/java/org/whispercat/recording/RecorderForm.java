@@ -433,11 +433,25 @@ public class RecorderForm extends javax.swing.JPanel {
                     "Converting OGG to WAV...");
             fileToTranscribe = convertOggToWav(file);
             if (fileToTranscribe == null) {
-                console.logError("OGG conversion failed - Java doesn't natively support OGG");
-                console.log("💡 Solution: Convert to WAV manually using VLC, Audacity, or ffmpeg");
-                console.log("   Example: ffmpeg -i input.ogg output.wav");
-                Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
-                        "OGG conversion failed. Convert to WAV manually (use VLC/Audacity/ffmpeg).");
+                console.logError("OGG conversion failed");
+                if (!isFfmpegAvailable()) {
+                    console.log("⚠ ffmpeg not installed - automatic OGG conversion unavailable");
+                    console.log("💡 Install ffmpeg for automatic OGG conversion:");
+                    console.log("   Windows: choco install ffmpeg  OR  download from ffmpeg.org");
+                    console.log("   Linux: sudo apt install ffmpeg");
+                    console.log("   macOS: brew install ffmpeg");
+                    console.log("");
+                    console.log("💡 Or convert manually:");
+                    console.log("   ffmpeg -i input.ogg output.wav");
+                    console.log("   Or use VLC, Audacity, or any audio converter");
+                    Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                            "OGG conversion failed. Install ffmpeg or convert to WAV manually.");
+                } else {
+                    console.log("💡 Solution: Convert to WAV manually using VLC, Audacity, or ffmpeg");
+                    console.log("   Example: ffmpeg -i input.ogg output.wav");
+                    Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                            "OGG conversion failed. Convert to WAV manually (use VLC/Audacity/ffmpeg).");
+                }
                 resetUIAfterTranscription();
                 return;
             }
@@ -451,34 +465,81 @@ public class RecorderForm extends javax.swing.JPanel {
     }
 
     /**
-     * Converts an OGG file to WAV format using javax.sound.sampled.
-     * Note: This is a basic conversion. For better OGG support, consider adding a library like jorbis.
+     * Converts an OGG file to WAV format.
+     * First attempts to use ffmpeg if available, otherwise falls back to Java AudioSystem.
      */
     private File convertOggToWav(File oggFile) {
+        ConsoleLogger console = ConsoleLogger.getInstance();
+
         try {
             // Create temporary WAV file
             File wavFile = File.createTempFile("whispercat_converted_", ".wav");
             wavFile.deleteOnExit();
 
-            // Note: javax.sound.sampled doesn't natively support OGG
-            // This will attempt to read using AudioSystem but may fail
-            // Users should ideally use external tools or libraries for proper OGG support
+            // First, try using ffmpeg if available
+            if (isFfmpegAvailable()) {
+                console.log("⚙ Using ffmpeg for OGG conversion...");
+                try {
+                    ProcessBuilder pb = new ProcessBuilder(
+                        "ffmpeg",
+                        "-i", oggFile.getAbsolutePath(),
+                        "-ar", "16000",  // 16kHz sample rate (good for speech)
+                        "-ac", "1",      // Mono
+                        "-y",            // Overwrite output file
+                        wavFile.getAbsolutePath()
+                    );
+                    pb.redirectErrorStream(true);
+                    Process process = pb.start();
+
+                    int exitCode = process.waitFor();
+                    if (exitCode == 0) {
+                        console.logSuccess("ffmpeg conversion successful");
+                        logger.info("Successfully converted OGG to WAV using ffmpeg");
+                        return wavFile;
+                    } else {
+                        console.logError("ffmpeg conversion failed with exit code: " + exitCode);
+                        logger.error("ffmpeg conversion failed with exit code: " + exitCode);
+                    }
+                } catch (Exception e) {
+                    logger.error("Error using ffmpeg for conversion", e);
+                    console.logError("ffmpeg conversion error: " + e.getMessage());
+                }
+            } else {
+                console.log("⚠ ffmpeg not found, trying Java AudioSystem...");
+            }
+
+            // Fallback: try Java's AudioSystem (will likely fail for OGG)
             try {
                 AudioInputStream audioStream = AudioSystem.getAudioInputStream(oggFile);
                 javax.sound.sampled.AudioSystem.write(audioStream,
                         javax.sound.sampled.AudioFileFormat.Type.WAVE, wavFile);
                 audioStream.close();
-                logger.info("Successfully converted OGG to WAV");
+                console.logSuccess("Java AudioSystem conversion successful");
+                logger.info("Successfully converted OGG to WAV using AudioSystem");
                 return wavFile;
             } catch (Exception e) {
-                logger.error("Failed to convert OGG using AudioSystem. OGG codec may not be installed.", e);
-                // Return null to indicate conversion failed
-                // User will need to manually convert using external tools
+                logger.error("Failed to convert OGG using AudioSystem. OGG codec not supported.", e);
+                // Both methods failed
                 return null;
             }
         } catch (Exception e) {
             logger.error("Error creating temp file for conversion", e);
             return null;
+        }
+    }
+
+    /**
+     * Check if ffmpeg is available on the system.
+     */
+    private boolean isFfmpegAvailable() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("ffmpeg", "-version");
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            int exitCode = process.waitFor();
+            return exitCode == 0;
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -808,6 +869,12 @@ public class RecorderForm extends javax.swing.JPanel {
                     if (selectedItem != null && selectedItem.uuid != null) {
                         Pipeline pipeline = configManager.getPipelineByUuid(selectedItem.uuid);
                         if (pipeline != null) {
+                            // Update UI to show post-processing is happening (keep blue indicator)
+                            recordButton.setText("Post-processing...");
+                            recordButton.setEnabled(false);
+                            isTranscribing = true;  // Keep blue indicator during post-processing
+                            statusIndicatorPanel.repaint();
+
                             PostProcessingService ppService = new PostProcessingService(configManager);
                             String processedText = ppService.applyPipeline(transcript, pipeline);
                             RecorderForm.this.processedText.setText(processedText);
