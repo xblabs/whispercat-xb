@@ -1,7 +1,7 @@
 use crate::audio::{AudioBuffer, AudioRecorder, SilenceRemover};
 use crate::config::Config;
 use crate::pipeline::{ExecutionResult, Pipeline, PipelineExecutor};
-use crate::transcription::{TranscriptionRequest, WhisperClient};
+use crate::transcription::{TranscriptionClient, TranscriptionProvider, TranscriptionRequest};
 use crate::ui::{RecordingAction, RecordingScreen, SettingsAction, SettingsScreen};
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -124,10 +124,46 @@ impl App {
 
     fn transcribe(&mut self, audio_path: PathBuf) {
         let api_key = self.config.whisper.api_key.clone();
+        let provider_str = self.config.whisper.provider.clone();
+        let model = self.config.whisper.model.clone();
+        let faster_whisper_url = self.config.whisper.faster_whisper_url.clone();
+        let openwebui_url = self.config.whisper.openwebui_url.clone();
+        let openwebui_api_key = self.config.whisper.openwebui_api_key.clone();
 
-        if api_key.is_empty() {
-            self.recording_screen.error_message =
-                Some("Please set your OpenAI API key in Settings".to_string());
+        // Parse provider from config
+        let provider = match provider_str.as_str() {
+            "FasterWhisper" | "Faster-Whisper" => TranscriptionProvider::FasterWhisper,
+            "OpenWebUI" | "Open WebUI" => TranscriptionProvider::OpenWebUI,
+            _ => TranscriptionProvider::OpenAI,
+        };
+
+        // Validate configuration based on provider
+        let validation_error = match provider {
+            TranscriptionProvider::OpenAI => {
+                if api_key.is_empty() {
+                    Some("Please set your OpenAI API key in Settings".to_string())
+                } else {
+                    None
+                }
+            }
+            TranscriptionProvider::FasterWhisper => {
+                if faster_whisper_url.is_none() {
+                    Some("Please set Faster-Whisper server URL in Settings".to_string())
+                } else {
+                    None
+                }
+            }
+            TranscriptionProvider::OpenWebUI => {
+                if openwebui_url.is_none() || openwebui_api_key.is_none() {
+                    Some("Please set Open WebUI URL and API key in Settings".to_string())
+                } else {
+                    None
+                }
+            }
+        };
+
+        if let Some(error) = validation_error {
+            self.recording_screen.error_message = Some(error);
             return;
         }
 
@@ -135,7 +171,7 @@ impl App {
         let silence_config = self.config.silence_removal.clone();
 
         self.recording_screen.is_transcribing = true;
-        self.add_log("Starting transcription...".to_string());
+        self.add_log(format!("Starting transcription with {}...", provider.as_str()));
 
         tokio::spawn(async move {
             // Step 1: Load audio
@@ -203,12 +239,18 @@ impl App {
 
             // Step 3: Transcribe
             tx.send(AppMessage::Log {
-                message: "Sending to Whisper API...".to_string(),
+                message: format!("Sending to {} API...", provider.as_str()),
             })
             .ok();
 
-            let client = WhisperClient::new(api_key);
-            let request = TranscriptionRequest::new(audio_path);
+            let client = TranscriptionClient::new(
+                api_key,
+                faster_whisper_url,
+                openwebui_url,
+                openwebui_api_key,
+            );
+            let request = TranscriptionRequest::new(audio_path, provider)
+                .with_model(model);
 
             match client.transcribe(request).await {
                 Ok(response) => {

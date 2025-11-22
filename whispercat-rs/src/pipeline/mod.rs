@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::transcription::WhisperClient;
+use crate::transcription::TranscriptionClient;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -86,14 +86,14 @@ struct UnitBatch {
 }
 
 pub struct PipelineExecutor {
-    openai_client: WhisperClient,
+    client: TranscriptionClient,
     optimization_enabled: bool,
 }
 
 impl PipelineExecutor {
     pub fn new(openai_api_key: String) -> Self {
         Self {
-            openai_client: WhisperClient::new(openai_api_key),
+            client: TranscriptionClient::new(openai_api_key, None, None, None),
             optimization_enabled: true,
         }
     }
@@ -276,7 +276,7 @@ impl PipelineExecutor {
 
         // Execute single API call
         let model = batch.model.as_ref().unwrap();
-        let output = self.openai_client
+        let output = self.client
             .chat_completion(&system_prompt, &user_prompt, model)
             .await?;
 
@@ -343,7 +343,7 @@ impl PipelineExecutor {
                 ..
             } => {
                 let user_prompt = user_prompt_template.replace("{{input}}", input);
-                self.openai_client
+                self.client
                     .chat_completion(system_prompt, &user_prompt, model)
                     .await
             }

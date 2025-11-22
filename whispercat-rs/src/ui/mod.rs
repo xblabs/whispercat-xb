@@ -112,6 +112,11 @@ pub enum RecordingAction {
 
 pub struct SettingsScreen {
     pub api_key_input: String,
+    pub provider_selection: usize,
+    pub model_input: String,
+    pub faster_whisper_url: String,
+    pub openwebui_url: String,
+    pub openwebui_api_key: String,
     pub silence_threshold: f32,
     pub min_silence_duration: u32,
     pub silence_removal_enabled: bool,
@@ -119,8 +124,19 @@ pub struct SettingsScreen {
 
 impl SettingsScreen {
     pub fn from_config(config: &Config) -> Self {
+        let provider_idx = match config.whisper.provider.as_str() {
+            "FasterWhisper" | "Faster-Whisper" => 1,
+            "OpenWebUI" | "Open WebUI" => 2,
+            _ => 0,
+        };
+
         Self {
             api_key_input: config.whisper.api_key.clone(),
+            provider_selection: provider_idx,
+            model_input: config.whisper.model.clone(),
+            faster_whisper_url: config.whisper.faster_whisper_url.clone().unwrap_or_default(),
+            openwebui_url: config.whisper.openwebui_url.clone().unwrap_or_default(),
+            openwebui_api_key: config.whisper.openwebui_api_key.clone().unwrap_or_default(),
             silence_threshold: config.silence_removal.threshold,
             min_silence_duration: config.silence_removal.min_duration_ms,
             silence_removal_enabled: config.silence_removal.enabled,
@@ -133,23 +149,131 @@ impl SettingsScreen {
         ui.heading("⚙️ Settings");
         ui.add_space(20.0);
 
-        // API Key
+        // Provider Selection
         ui.group(|ui| {
             ui.vertical(|ui| {
-                ui.label(RichText::new("OpenAI API Key").strong());
+                ui.label(RichText::new("Transcription Provider").strong());
                 ui.add_space(5.0);
 
-                let response = ui.add(
-                    egui::TextEdit::singleline(&mut self.api_key_input)
-                        .password(true)
-                        .hint_text("sk-..."),
-                );
+                let providers = ["OpenAI", "Faster-Whisper", "Open WebUI"];
 
-                if response.changed() {
-                    action = SettingsAction::SaveConfig;
-                }
+                ui.horizontal(|ui| {
+                    for (idx, provider) in providers.iter().enumerate() {
+                        if ui.selectable_label(self.provider_selection == idx, *provider).clicked() {
+                            self.provider_selection = idx;
+                            action = SettingsAction::SaveConfig;
+                        }
+                    }
+                });
             });
         });
+
+        ui.add_space(10.0);
+
+        // Provider-specific settings
+        match self.provider_selection {
+            0 => {
+                // OpenAI
+                ui.group(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new("OpenAI Configuration").strong());
+                        ui.add_space(5.0);
+
+                        ui.label("API Key:");
+                        let response = ui.add(
+                            egui::TextEdit::singleline(&mut self.api_key_input)
+                                .password(true)
+                                .hint_text("sk-..."),
+                        );
+                        if response.changed() {
+                            action = SettingsAction::SaveConfig;
+                        }
+
+                        ui.add_space(5.0);
+
+                        ui.label("Model:");
+                        let response = ui.add(
+                            egui::TextEdit::singleline(&mut self.model_input)
+                                .hint_text("whisper-1"),
+                        );
+                        if response.changed() {
+                            action = SettingsAction::SaveConfig;
+                        }
+                    });
+                });
+            }
+            1 => {
+                // Faster-Whisper
+                ui.group(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new("Faster-Whisper Configuration").strong());
+                        ui.add_space(5.0);
+
+                        ui.label("Server URL:");
+                        let response = ui.add(
+                            egui::TextEdit::singleline(&mut self.faster_whisper_url)
+                                .hint_text("http://localhost:8000"),
+                        );
+                        if response.changed() {
+                            action = SettingsAction::SaveConfig;
+                        }
+
+                        ui.add_space(5.0);
+
+                        ui.label("Model:");
+                        let response = ui.add(
+                            egui::TextEdit::singleline(&mut self.model_input)
+                                .hint_text("Systran/faster-whisper-large-v3"),
+                        );
+                        if response.changed() {
+                            action = SettingsAction::SaveConfig;
+                        }
+                    });
+                });
+            }
+            2 => {
+                // Open WebUI
+                ui.group(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new("Open WebUI Configuration").strong());
+                        ui.add_space(5.0);
+
+                        ui.label("Server URL:");
+                        let response = ui.add(
+                            egui::TextEdit::singleline(&mut self.openwebui_url)
+                                .hint_text("https://localhost:8080"),
+                        );
+                        if response.changed() {
+                            action = SettingsAction::SaveConfig;
+                        }
+
+                        ui.add_space(5.0);
+
+                        ui.label("API Key:");
+                        let response = ui.add(
+                            egui::TextEdit::singleline(&mut self.openwebui_api_key)
+                                .password(true)
+                                .hint_text("owui-..."),
+                        );
+                        if response.changed() {
+                            action = SettingsAction::SaveConfig;
+                        }
+
+                        ui.add_space(5.0);
+
+                        ui.label("Model:");
+                        let response = ui.add(
+                            egui::TextEdit::singleline(&mut self.model_input)
+                                .hint_text("whisper-1"),
+                        );
+                        if response.changed() {
+                            action = SettingsAction::SaveConfig;
+                        }
+                    });
+                });
+            }
+            _ => {}
+        }
 
         ui.add_space(20.0);
 
@@ -198,7 +322,37 @@ impl SettingsScreen {
     }
 
     pub fn to_config(&self, config: &mut Config) {
+        // Provider selection
+        config.whisper.provider = match self.provider_selection {
+            1 => "Faster-Whisper".to_string(),
+            2 => "Open WebUI".to_string(),
+            _ => "OpenAI".to_string(),
+        };
+
+        // Common settings
+        config.whisper.model = self.model_input.clone();
         config.whisper.api_key = self.api_key_input.clone();
+
+        // Provider-specific settings
+        config.whisper.faster_whisper_url = if self.faster_whisper_url.is_empty() {
+            None
+        } else {
+            Some(self.faster_whisper_url.clone())
+        };
+
+        config.whisper.openwebui_url = if self.openwebui_url.is_empty() {
+            None
+        } else {
+            Some(self.openwebui_url.clone())
+        };
+
+        config.whisper.openwebui_api_key = if self.openwebui_api_key.is_empty() {
+            None
+        } else {
+            Some(self.openwebui_api_key.clone())
+        };
+
+        // Silence removal settings
         config.silence_removal.threshold = self.silence_threshold;
         config.silence_removal.min_duration_ms = self.min_silence_duration;
         config.silence_removal.enabled = self.silence_removal_enabled;

@@ -66,6 +66,10 @@ impl Config {
 pub struct WhisperConfig {
     pub api_key: String,
     pub model: String,
+    pub provider: String,
+    pub faster_whisper_url: Option<String>,
+    pub openwebui_url: Option<String>,
+    pub openwebui_api_key: Option<String>,
 }
 
 impl Default for WhisperConfig {
@@ -73,6 +77,10 @@ impl Default for WhisperConfig {
         Self {
             api_key: String::new(),
             model: "whisper-1".to_string(),
+            provider: "OpenAI".to_string(),
+            faster_whisper_url: None,
+            openwebui_url: None,
+            openwebui_api_key: None,
         }
     }
 }

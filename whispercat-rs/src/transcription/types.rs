@@ -1,9 +1,27 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum TranscriptionProvider {
+    OpenAI,
+    FasterWhisper,
+    OpenWebUI,
+}
+
+impl TranscriptionProvider {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TranscriptionProvider::OpenAI => "OpenAI",
+            TranscriptionProvider::FasterWhisper => "Faster-Whisper",
+            TranscriptionProvider::OpenWebUI => "Open WebUI",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TranscriptionRequest {
     pub file_path: PathBuf,
+    pub provider: TranscriptionProvider,
     pub model: String,
     pub language: Option<String>,
     pub prompt: Option<String>,
@@ -12,15 +30,27 @@ pub struct TranscriptionRequest {
 }
 
 impl TranscriptionRequest {
-    pub fn new(file_path: PathBuf) -> Self {
+    pub fn new(file_path: PathBuf, provider: TranscriptionProvider) -> Self {
+        let model = match provider {
+            TranscriptionProvider::OpenAI => "whisper-1".to_string(),
+            TranscriptionProvider::FasterWhisper => "Systran/faster-whisper-large-v3".to_string(),
+            TranscriptionProvider::OpenWebUI => "whisper-1".to_string(),
+        };
+
         Self {
             file_path,
-            model: "whisper-1".to_string(),
+            provider,
+            model,
             language: None,
             prompt: None,
             temperature: None,
             response_format: Some("json".to_string()),
         }
+    }
+
+    pub fn with_model(mut self, model: impl Into<String>) -> Self {
+        self.model = model.into();
+        self
     }
 
     pub fn with_language(mut self, language: impl Into<String>) -> Self {
