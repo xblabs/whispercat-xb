@@ -791,6 +791,9 @@ public class RecorderForm extends javax.swing.JPanel {
                                 trayManager.showSystemNotification("WhisperCat", "Post-processing completed");
                             }
                             playClickSound();
+                            // Remove focus from text areas to prevent pasting into them
+                            transcriptionTextArea.transferFocus();
+                            RecorderForm.this.processedText.transferFocus();
                             copyTranscriptionToClipboard(processedText);
                             pasteFromClipboard();
                             updateTrayMenu();
@@ -805,6 +808,8 @@ public class RecorderForm extends javax.swing.JPanel {
             } else if (transcript != null && !transcript.trim().isEmpty()) {
                 // No post-processing, just copy raw transcript if auto-paste enabled
                 if (configManager.isAutoPasteEnabled()) {
+                    // Remove focus from transcription area to prevent pasting into itself
+                    transcriptionTextArea.transferFocus();
                     copyTranscriptionToClipboard(transcript);
                     pasteFromClipboard();
                 }
