@@ -275,6 +275,43 @@ public class ConfigManager {
         saveConfig();
     }
 
+    // Silence removal settings
+    public boolean isSilenceRemovalEnabled() {
+        return Boolean.parseBoolean(properties.getProperty("silenceRemovalEnabled", "true"));
+    }
+
+    public void setSilenceRemovalEnabled(boolean enabled) {
+        properties.setProperty("silenceRemovalEnabled", String.valueOf(enabled));
+        saveConfig();
+    }
+
+    public float getSilenceThreshold() {
+        return Float.parseFloat(properties.getProperty("silenceThreshold", "0.01"));
+    }
+
+    public void setSilenceThreshold(float threshold) {
+        properties.setProperty("silenceThreshold", String.valueOf(threshold));
+        saveConfig();
+    }
+
+    public int getMinSilenceDuration() {
+        return Integer.parseInt(properties.getProperty("minSilenceDuration", "1500"));
+    }
+
+    public void setMinSilenceDuration(int durationMs) {
+        properties.setProperty("minSilenceDuration", String.valueOf(durationMs));
+        saveConfig();
+    }
+
+    public boolean isKeepCompressedFile() {
+        return Boolean.parseBoolean(properties.getProperty("keepCompressedFile", "false"));
+    }
+
+    public void setKeepCompressedFile(boolean keep) {
+        properties.setProperty("keepCompressedFile", String.valueOf(keep));
+        saveConfig();
+    }
+
     // openwebUIApiKey
     public String getOpenWebUIApiKey() {
         return properties.getProperty("openWebUIApiKey", "");

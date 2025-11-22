@@ -663,20 +663,32 @@ public class RecorderForm extends javax.swing.JPanel {
         protected String doInBackground() {
             ConsoleLogger console = ConsoleLogger.getInstance();
             try {
+                // Apply silence removal if enabled
+                File fileToTranscribe = audioFile;
+                if (configManager.isSilenceRemovalEnabled()) {
+                    console.separator();
+                    fileToTranscribe = SilenceRemover.removeSilence(
+                        audioFile,
+                        configManager.getSilenceThreshold(),
+                        configManager.getMinSilenceDuration(),
+                        configManager.isKeepCompressedFile()
+                    );
+                }
+
                 String server = configManager.getWhisperServer();
                 console.separator();
                 console.log("Starting transcription using " + server);
-                console.log("Audio file: " + audioFile.getName());
+                console.log("Audio file: " + fileToTranscribe.getName());
 
                 if (server.equals("OpenAI")) {
                     logger.info("Transcribing audio using OpenAI");
-                    return whisperClient.transcribe(audioFile);
+                    return whisperClient.transcribe(fileToTranscribe);
                 } else if (server.equals("Faster-Whisper")) {
                     logger.info("Transcribing audio using Faster-Whisper");
-                    return fasterWhisperTranscribeClient.transcribe(audioFile);
+                    return fasterWhisperTranscribeClient.transcribe(fileToTranscribe);
                 } else if (server.equals("Open WebUI")) {
                     logger.info("Transcribing audio using Open WebUI");
-                    return openWebUITranscribeClient.transcribeAudio(audioFile);
+                    return openWebUITranscribeClient.transcribeAudio(fileToTranscribe);
                 } else {
                     logger.error("Unknown Whisper server: " + server);
                     console.logError("Unknown Whisper server: " + server);

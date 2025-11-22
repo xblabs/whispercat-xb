@@ -36,6 +36,12 @@ public class SettingsForm extends JPanel {
     private final JProgressBar volumeBar;
     private final JButton stopTestButton;
     private final JButton testMicrophoneButton;
+
+    // Silence removal settings
+    private JCheckBox silenceRemovalSwitch;
+    private JSlider silenceThresholdSlider;
+    private JSlider minSilenceDurationSlider;
+    private JCheckBox keepCompressedSwitch;
     private AudioFormat format;
     private TargetDataLine line;
     private TestWorker testWorker;
@@ -238,6 +244,105 @@ public class SettingsForm extends JPanel {
         gbc.weightx = 1.0;
         gbc.anchor = GridBagConstraints.WEST;
         contentPanel.add(stopSoundSwitch, gbc);
+
+        row++;
+
+        // Silence Removal Settings
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0;
+        gbc.anchor = GridBagConstraints.EAST;
+        contentPanel.add(new JLabel("Auto-remove silence:"), gbc);
+        silenceRemovalSwitch = new JCheckBox();
+        silenceRemovalSwitch.setSelected(configManager.isSilenceRemovalEnabled());
+        gbc.gridx = 1;
+        gbc.gridy = row;
+        gbc.gridwidth = 2;
+        gbc.weightx = 1.0;
+        gbc.anchor = GridBagConstraints.WEST;
+        contentPanel.add(silenceRemovalSwitch, gbc);
+
+        row++;
+
+        // Silence threshold slider
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0;
+        gbc.anchor = GridBagConstraints.EAST;
+        JLabel thresholdLabel = new JLabel("Silence threshold:");
+        contentPanel.add(thresholdLabel, gbc);
+
+        JPanel thresholdPanel = new JPanel(new BorderLayout(5, 0));
+        silenceThresholdSlider = new JSlider(1, 50, (int)(configManager.getSilenceThreshold() * 1000));
+        silenceThresholdSlider.setMajorTickSpacing(10);
+        silenceThresholdSlider.setMinorTickSpacing(5);
+        silenceThresholdSlider.setPaintTicks(true);
+        JLabel thresholdValueLabel = new JLabel(String.format("%.3f", configManager.getSilenceThreshold()));
+        thresholdPanel.add(silenceThresholdSlider, BorderLayout.CENTER);
+        thresholdPanel.add(thresholdValueLabel, BorderLayout.EAST);
+
+        silenceThresholdSlider.addChangeListener(e -> {
+            float value = silenceThresholdSlider.getValue() / 1000.0f;
+            thresholdValueLabel.setText(String.format("%.3f", value));
+        });
+
+        gbc.gridx = 1;
+        gbc.gridy = row;
+        gbc.gridwidth = 2;
+        gbc.weightx = 1.0;
+        gbc.anchor = GridBagConstraints.WEST;
+        contentPanel.add(thresholdPanel, gbc);
+
+        row++;
+
+        // Minimum silence duration slider
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0;
+        gbc.anchor = GridBagConstraints.EAST;
+        JLabel durationLabel = new JLabel("Min silence duration:");
+        contentPanel.add(durationLabel, gbc);
+
+        JPanel durationPanel = new JPanel(new BorderLayout(5, 0));
+        minSilenceDurationSlider = new JSlider(500, 3000, configManager.getMinSilenceDuration());
+        minSilenceDurationSlider.setMajorTickSpacing(500);
+        minSilenceDurationSlider.setMinorTickSpacing(100);
+        minSilenceDurationSlider.setPaintTicks(true);
+        JLabel durationValueLabel = new JLabel(configManager.getMinSilenceDuration() + "ms");
+        durationPanel.add(minSilenceDurationSlider, BorderLayout.CENTER);
+        durationPanel.add(durationValueLabel, BorderLayout.EAST);
+
+        minSilenceDurationSlider.addChangeListener(e -> {
+            durationValueLabel.setText(minSilenceDurationSlider.getValue() + "ms");
+        });
+
+        gbc.gridx = 1;
+        gbc.gridy = row;
+        gbc.gridwidth = 2;
+        gbc.weightx = 1.0;
+        gbc.anchor = GridBagConstraints.WEST;
+        contentPanel.add(durationPanel, gbc);
+
+        row++;
+
+        // Keep compressed files checkbox
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0;
+        gbc.anchor = GridBagConstraints.EAST;
+        contentPanel.add(new JLabel("Keep compressed files:"), gbc);
+        keepCompressedSwitch = new JCheckBox();
+        keepCompressedSwitch.setSelected(configManager.isKeepCompressedFile());
+        gbc.gridx = 1;
+        gbc.gridy = row;
+        gbc.gridwidth = 2;
+        gbc.weightx = 1.0;
+        gbc.anchor = GridBagConstraints.WEST;
+        contentPanel.add(keepCompressedSwitch, gbc);
 
         row++;
 
@@ -883,6 +988,13 @@ public class SettingsForm extends JPanel {
         configManager.setProperty("groqApiKey", groqApiKey);
         String groqModel = (String) groqModelComboBox.getSelectedItem();
         configManager.setProperty("groqModel", groqModel);
+
+        // Save silence removal settings
+        configManager.setSilenceRemovalEnabled(silenceRemovalSwitch.isSelected());
+        configManager.setSilenceThreshold(silenceThresholdSlider.getValue() / 1000.0f);
+        configManager.setMinSilenceDuration(minSilenceDurationSlider.getValue());
+        configManager.setKeepCompressedFile(keepCompressedSwitch.isSelected());
+
         configManager.saveConfig();
         Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
                 "Settings saved.");
