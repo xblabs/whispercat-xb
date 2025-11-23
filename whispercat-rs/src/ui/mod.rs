@@ -164,6 +164,8 @@ pub struct SettingsScreen {
     pub available_models: Vec<String>,
     pub fetching_models: bool,
     pub show_model_dropdown: bool,
+    pub hotkey_input: String,
+    pub recording_hotkey: bool,
 }
 
 impl SettingsScreen {
@@ -188,6 +190,8 @@ impl SettingsScreen {
             available_models: Vec::new(),
             fetching_models: false,
             show_model_dropdown: false,
+            hotkey_input: config.hotkeys.record_toggle.clone(),
+            recording_hotkey: false,
         }
     }
 
@@ -460,6 +464,62 @@ impl SettingsScreen {
             });
         });
 
+        ui.add_space(20.0);
+
+        // Hotkey Settings
+        ui.group(|ui| {
+            ui.vertical(|ui| {
+                ui.label(RichText::new("Hotkey Configuration").strong());
+                ui.add_space(5.0);
+
+                ui.label("Record Toggle Hotkey:");
+                ui.add_space(3.0);
+
+                ui.horizontal(|ui| {
+                    // Display current hotkey
+                    let hotkey_display = if self.recording_hotkey {
+                        "Press keys... (ESC to cancel)".to_string()
+                    } else {
+                        self.hotkey_input.clone()
+                    };
+
+                    let text_response = ui.add(
+                        egui::TextEdit::singleline(&mut self.hotkey_input)
+                            .hint_text("Ctrl+Shift+R")
+                            .text_color(if self.recording_hotkey {
+                                egui::Color32::YELLOW
+                            } else {
+                                egui::Color32::WHITE
+                            })
+                    );
+
+                    if text_response.changed() && !self.recording_hotkey {
+                        action = SettingsAction::SaveConfig;
+                    }
+
+                    // Record button
+                    let button_text = if self.recording_hotkey {
+                        "⏹ Stop Recording"
+                    } else {
+                        "🎹 Record Hotkey"
+                    };
+
+                    if ui.button(button_text).clicked() {
+                        self.recording_hotkey = !self.recording_hotkey;
+                        if self.recording_hotkey {
+                            self.hotkey_input.clear();
+                        }
+                    }
+                });
+
+                ui.add_space(5.0);
+                ui.label("Supported formats:");
+                ui.label("  • Single key: Ctrl+Shift+R, Alt+F1, F5");
+                ui.label("  • Sequences: Ctrl+K, Ctrl+S (VS Code style)");
+                ui.label("  • Modifiers: Ctrl, Shift, Alt, Super/Win/Cmd");
+            });
+        });
+
         action
     }
 
@@ -501,6 +561,9 @@ impl SettingsScreen {
 
         // UI settings
         config.ui.auto_paste = self.auto_paste;
+
+        // Hotkey settings
+        config.hotkeys.record_toggle = self.hotkey_input.clone();
     }
 }
 
