@@ -12,7 +12,7 @@ public class MenuAnimation {
             hash.get(menu).stop();
         }
         menu.setMenuShow(show);
-        Animator animator = new Animator(400, new Animator.TimingTarget() {
+        Animator animator = new Animator(150, new Animator.TimingTarget() {
             @Override
             public void timingEvent(float f) {
                 if (show) {
