@@ -1,4 +1,5 @@
 use crate::audio::{AudioBuffer, AudioRecorder, SilenceRemover};
+use crate::autopaste::AutoPaster;
 use crate::config::Config;
 use crate::hotkey::HotkeyManager;
 use crate::pipeline::{ExecutionResult, Pipeline, PipelineExecutor};
@@ -34,6 +35,9 @@ pub struct App {
 
     // Global hotkeys
     hotkey_manager: Option<HotkeyManager>,
+
+    // Auto-paste
+    auto_paster: Option<AutoPaster>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -81,6 +85,12 @@ impl App {
             }
         }
 
+        // Initialize auto-paster
+        let auto_paster = AutoPaster::new().ok();
+        if auto_paster.is_none() {
+            tracing::warn!("Failed to initialize auto-paster - clipboard functionality may be limited");
+        }
+
         Self {
             current_screen: Screen::Recording,
             recorder: None,
@@ -93,6 +103,7 @@ impl App {
             execution_log: Vec::new(),
             pipeline_executor,
             hotkey_manager,
+            auto_paster,
         }
     }
 
@@ -312,16 +323,46 @@ impl App {
                     self.transcribe(path);
                 }
                 AppMessage::TranscriptionComplete { text } => {
-                    self.recording_screen.transcription_result = Some(text);
+                    self.recording_screen.transcription_result = Some(text.clone());
                     self.recording_screen.is_transcribing = false;
                     self.add_log("Transcription complete".to_string());
+
+                    // Auto-paste if enabled
+                    if self.config.ui.auto_paste {
+                        if let Some(ref mut paster) = self.auto_paster {
+                            match paster.copy_and_paste(&text, true) {
+                                Ok(()) => {
+                                    self.add_log("Auto-pasted transcription result".to_string());
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Auto-paste failed: {}", e);
+                                    self.add_log(format!("Auto-paste failed: {}", e));
+                                }
+                            }
+                        }
+                    }
                 }
                 AppMessage::PipelineComplete { result } => {
-                    self.recording_screen.transcription_result = Some(result.output);
+                    self.recording_screen.transcription_result = Some(result.output.clone());
                     self.add_log(format!(
                         "Pipeline complete in {:?}",
                         result.total_duration
                     ));
+
+                    // Auto-paste if enabled
+                    if self.config.ui.auto_paste {
+                        if let Some(ref mut paster) = self.auto_paster {
+                            match paster.copy_and_paste(&result.output, true) {
+                                Ok(()) => {
+                                    self.add_log("Auto-pasted pipeline result".to_string());
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Auto-paste failed: {}", e);
+                                    self.add_log(format!("Auto-paste failed: {}", e));
+                                }
+                            }
+                        }
+                    }
                 }
                 AppMessage::Error { message } => {
                     self.recording_screen.error_message = Some(message.clone());

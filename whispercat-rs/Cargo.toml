@@ -36,6 +36,7 @@ uuid = { version = "1", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "5"
 regex = "1"
+arboard = "3.3"
 
 # Platform-specific
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]

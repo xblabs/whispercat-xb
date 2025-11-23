@@ -120,6 +120,7 @@ pub struct SettingsScreen {
     pub silence_threshold: f32,
     pub min_silence_duration: u32,
     pub silence_removal_enabled: bool,
+    pub auto_paste: bool,
 }
 
 impl SettingsScreen {
@@ -140,6 +141,7 @@ impl SettingsScreen {
             silence_threshold: config.silence_removal.threshold,
             min_silence_duration: config.silence_removal.min_duration_ms,
             silence_removal_enabled: config.silence_removal.enabled,
+            auto_paste: config.ui.auto_paste,
         }
     }
 
@@ -318,6 +320,24 @@ impl SettingsScreen {
             });
         });
 
+        ui.add_space(20.0);
+
+        // Auto-paste Settings
+        ui.group(|ui| {
+            ui.vertical(|ui| {
+                ui.label(RichText::new("Auto-Paste").strong());
+                ui.add_space(5.0);
+
+                let checkbox = ui.checkbox(&mut self.auto_paste, "Automatically paste transcription results");
+                if checkbox.changed() {
+                    action = SettingsAction::SaveConfig;
+                }
+
+                ui.add_space(5.0);
+                ui.label("When enabled, transcription results will be automatically copied to clipboard and pasted using Ctrl+V (Cmd+V on macOS)");
+            });
+        });
+
         action
     }
 
@@ -356,6 +376,9 @@ impl SettingsScreen {
         config.silence_removal.threshold = self.silence_threshold;
         config.silence_removal.min_duration_ms = self.min_silence_duration;
         config.silence_removal.enabled = self.silence_removal_enabled;
+
+        // UI settings
+        config.ui.auto_paste = self.auto_paste;
     }
 }
 

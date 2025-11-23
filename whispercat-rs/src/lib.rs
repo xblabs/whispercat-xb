@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod autopaste;
 pub mod config;
 pub mod error;
 pub mod hotkey;
