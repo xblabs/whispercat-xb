@@ -4,6 +4,7 @@ mod autopaste;
 mod config;
 mod error;
 mod hotkey;
+mod logger;
 mod pipeline;
 mod transcription;
 mod ui;

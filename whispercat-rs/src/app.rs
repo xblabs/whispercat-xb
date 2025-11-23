@@ -2,6 +2,7 @@ use crate::audio::{AudioBuffer, AudioRecorder, SilenceRemover};
 use crate::autopaste::AutoPaster;
 use crate::config::Config;
 use crate::hotkey::HotkeyManager;
+use crate::logger::StructuredLogger;
 use crate::pipeline::{ExecutionResult, Pipeline, PipelineExecutor};
 use crate::transcription::{TranscriptionClient, TranscriptionProvider, TranscriptionRequest};
 use crate::ui::{RecordingAction, RecordingScreen, SettingsAction, SettingsScreen};
@@ -28,7 +29,7 @@ pub struct App {
     message_tx: mpsc::Sender<AppMessage>,
 
     // Logging
-    execution_log: Vec<String>,
+    logger: StructuredLogger,
 
     // Pipeline state
     pipeline_executor: Option<PipelineExecutor>,
@@ -100,7 +101,7 @@ impl App {
             config,
             message_rx: rx,
             message_tx: tx,
-            execution_log: Vec::new(),
+            logger: StructuredLogger::new(),
             pipeline_executor,
             hotkey_manager,
             auto_paster,
@@ -301,11 +302,16 @@ impl App {
 
     fn add_log(&mut self, message: String) {
         tracing::info!("{}", message);
-        self.execution_log.push(message);
 
-        // Keep log size manageable
-        if self.execution_log.len() > 100 {
-            self.execution_log.remove(0);
+        // Determine log level based on message content
+        if message.to_lowercase().contains("error") || message.to_lowercase().contains("failed") {
+            self.logger.error(message);
+        } else if message.to_lowercase().contains("warning") || message.to_lowercase().contains("⚠") {
+            self.logger.warning(message);
+        } else if message.to_lowercase().contains("complete") || message.to_lowercase().contains("success") || message.to_lowercase().contains("✓") {
+            self.logger.success(message);
+        } else {
+            self.logger.info(message);
         }
     }
 
@@ -456,18 +462,25 @@ impl eframe::App for App {
             });
         });
 
-        // Bottom panel with execution log
+        // Bottom panel with structured execution log
         egui::TopBottomPanel::bottom("log_panel")
-            .min_height(100.0)
+            .min_height(150.0)
             .show(ctx, |ui| {
-                ui.heading("Execution Log");
-                ui.separator();
-
-                egui::ScrollArea::vertical().max_height(80.0).show(ui, |ui| {
-                    for log in self.execution_log.iter().rev().take(20) {
-                        ui.label(log);
+                ui.horizontal(|ui| {
+                    ui.heading("Execution Log");
+                    ui.add_space(10.0);
+                    if ui.button("Clear").clicked() {
+                        self.logger.clear();
                     }
                 });
+                ui.separator();
+
+                egui::ScrollArea::vertical()
+                    .max_height(120.0)
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        self.logger.render(ui);
+                    });
             });
 
         // Request repaint if recording to update duration
