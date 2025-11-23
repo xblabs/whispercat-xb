@@ -491,6 +491,12 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Configure UI style
+        ctx.style_mut(|style| {
+            // Set animation time to 150ms for snappier feel
+            style.animation_time = 0.15;
+        });
+
         // Process background messages
         self.process_messages();
 
@@ -538,18 +544,22 @@ impl eframe::App for App {
             tray.update_recording_state(self.recording_screen.is_recording);
         }
 
-        // Top panel with navigation
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.selectable_value(&mut self.current_screen, Screen::Recording, "🎤 Recording");
-                ui.selectable_value(&mut self.current_screen, Screen::Pipelines, "📋 Pipelines");
-                ui.selectable_value(&mut self.current_screen, Screen::Settings, "⚙️ Settings");
+        // Top panel with navigation - Side pane color #1E1F22
+        egui::TopBottomPanel::top("top_panel")
+            .frame(egui::Frame::none().fill(egui::Color32::from_rgb(0x1E, 0x1F, 0x22)))
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.selectable_value(&mut self.current_screen, Screen::Recording, "🎤 Recording");
+                    ui.selectable_value(&mut self.current_screen, Screen::Pipelines, "📋 Pipelines");
+                    ui.selectable_value(&mut self.current_screen, Screen::Settings, "⚙️ Settings");
+                });
             });
-        });
 
-        // Central panel with current screen
-        egui::CentralPanel::default().show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
+        // Central panel with current screen - Main pane color #26282D
+        egui::CentralPanel::default()
+            .frame(egui::Frame::none().fill(egui::Color32::from_rgb(0x26, 0x28, 0x2D)))
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
                 match self.current_screen {
                     Screen::Recording => {
                         let action = self.recording_screen.ui(ui);
@@ -697,9 +707,10 @@ impl eframe::App for App {
             });
         });
 
-        // Bottom panel with structured execution log
+        // Bottom panel with structured execution log - Side pane color #1E1F22
         egui::TopBottomPanel::bottom("log_panel")
             .min_height(150.0)
+            .frame(egui::Frame::none().fill(egui::Color32::from_rgb(0x1E, 0x1F, 0x22)))
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.heading("Execution Log");
