@@ -1,6 +1,8 @@
 use crate::error::Result;
+use crate::pipeline::Pipeline;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -9,6 +11,10 @@ pub struct Config {
     pub silence_removal: SilenceRemovalConfig,
     pub hotkeys: HotkeyConfig,
     pub ui: UiConfig,
+    #[serde(default)]
+    pub pipelines: Vec<Pipeline>,
+    #[serde(default)]
+    pub last_used_pipeline: Option<Uuid>,
 }
 
 impl Default for Config {
@@ -19,6 +25,8 @@ impl Default for Config {
             silence_removal: SilenceRemovalConfig::default(),
             hotkeys: HotkeyConfig::default(),
             ui: UiConfig::default(),
+            pipelines: Vec::new(),
+            last_used_pipeline: None,
         }
     }
 }
@@ -59,6 +67,47 @@ impl Config {
             .unwrap_or_else(|| PathBuf::from("."))
             .join("whispercat")
             .join("config.toml")
+    }
+
+    // Pipeline management methods
+
+    /// Returns all saved pipelines
+    pub fn get_pipelines(&self) -> &[Pipeline] {
+        &self.pipelines
+    }
+
+    /// Gets a pipeline by UUID
+    pub fn get_pipeline(&self, id: Uuid) -> Option<&Pipeline> {
+        self.pipelines.iter().find(|p| p.id == id)
+    }
+
+    /// Saves or updates a pipeline
+    pub fn save_pipeline(&mut self, pipeline: Pipeline) {
+        // Check if pipeline already exists
+        if let Some(existing) = self.pipelines.iter_mut().find(|p| p.id == pipeline.id) {
+            *existing = pipeline;
+        } else {
+            self.pipelines.push(pipeline);
+        }
+    }
+
+    /// Deletes a pipeline by UUID
+    pub fn delete_pipeline(&mut self, id: Uuid) {
+        self.pipelines.retain(|p| p.id != id);
+        // Clear last used if it was deleted
+        if self.last_used_pipeline == Some(id) {
+            self.last_used_pipeline = None;
+        }
+    }
+
+    /// Gets the last used pipeline UUID
+    pub fn get_last_used_pipeline(&self) -> Option<Uuid> {
+        self.last_used_pipeline
+    }
+
+    /// Sets the last used pipeline UUID
+    pub fn set_last_used_pipeline(&mut self, id: Option<Uuid>) {
+        self.last_used_pipeline = id;
     }
 }
 

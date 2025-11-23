@@ -5,7 +5,7 @@ use crate::hotkey::HotkeyManager;
 use crate::logger::StructuredLogger;
 use crate::pipeline::{ExecutionResult, Pipeline, PipelineExecutor};
 use crate::transcription::{TranscriptionClient, TranscriptionProvider, TranscriptionRequest};
-use crate::ui::{RecordingAction, RecordingScreen, SettingsAction, SettingsScreen};
+use crate::ui::{RecordingAction, RecordingScreen, SettingsAction, SettingsScreen, PipelinesAction, PipelinesScreen};
 use std::path::PathBuf;
 use std::sync::mpsc;
 
@@ -20,6 +20,7 @@ pub struct App {
     // UI screens
     recording_screen: RecordingScreen,
     settings_screen: SettingsScreen,
+    pipelines_screen: PipelinesScreen,
 
     // Configuration
     config: Config,
@@ -45,6 +46,7 @@ pub struct App {
 pub enum Screen {
     Recording,
     Settings,
+    Pipelines,
 }
 
 pub enum AppMessage {
@@ -98,6 +100,7 @@ impl App {
             last_recording_path: None,
             recording_screen: RecordingScreen::default(),
             settings_screen,
+            pipelines_screen: PipelinesScreen::from_config(&config),
             config,
             message_rx: rx,
             message_tx: tx,
@@ -426,6 +429,7 @@ impl eframe::App for App {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.current_screen, Screen::Recording, "🎤 Recording");
+                ui.selectable_value(&mut self.current_screen, Screen::Pipelines, "📋 Pipelines");
                 ui.selectable_value(&mut self.current_screen, Screen::Settings, "⚙️ Settings");
             });
         });
@@ -447,6 +451,70 @@ impl eframe::App for App {
                                 // TODO: Show pipeline selection dialog
                             }
                             RecordingAction::None => {}
+                        }
+                    }
+                    Screen::Pipelines => {
+                        let action = self.pipelines_screen.ui(ui);
+                        match action {
+                            PipelinesAction::Save(pipeline) => {
+                                self.config.save_pipeline(pipeline);
+                                if let Err(e) = self.config.save() {
+                                    self.add_log(format!("Failed to save pipeline: {}", e));
+                                } else {
+                                    self.add_log("Pipeline saved successfully".to_string());
+                                    self.pipelines_screen.refresh_from_config(&self.config);
+                                }
+                            }
+                            PipelinesAction::Delete(id) => {
+                                self.config.delete_pipeline(id);
+                                if let Err(e) = self.config.save() {
+                                    self.add_log(format!("Failed to delete pipeline: {}", e));
+                                } else {
+                                    self.add_log("Pipeline deleted successfully".to_string());
+                                    self.pipelines_screen.refresh_from_config(&self.config);
+                                }
+                            }
+                            PipelinesAction::Execute(id) => {
+                                if let Some(pipeline) = self.config.get_pipeline(id).cloned() {
+                                    if let Some(text) = &self.recording_screen.transcription_result {
+                                        if let Some(ref executor) = self.pipeline_executor {
+                                            let executor_clone = executor.clone();
+                                            let pipeline_clone = pipeline.clone();
+                                            let text_clone = text.clone();
+                                            let tx = self.message_tx.clone();
+
+                                            self.add_log(format!("Executing pipeline: {}", pipeline.name));
+
+                                            tokio::spawn(async move {
+                                                match executor_clone.execute(text_clone, &pipeline_clone).await {
+                                                    Ok(result) => {
+                                                        tx.send(AppMessage::PipelineComplete { result }).ok();
+                                                    }
+                                                    Err(e) => {
+                                                        tx.send(AppMessage::Error {
+                                                            message: format!("Pipeline failed: {}", e),
+                                                        }).ok();
+                                                    }
+                                                }
+                                            });
+                                        } else {
+                                            self.add_log("No pipeline executor available".to_string());
+                                        }
+                                    } else {
+                                        self.add_log("No transcription result to process".to_string());
+                                    }
+                                } else {
+                                    self.add_log("Pipeline not found".to_string());
+                                }
+                            }
+                            PipelinesAction::RemoveUnit(idx) => {
+                                if let Some(ref mut pipeline) = self.pipelines_screen.editing_pipeline {
+                                    if idx < pipeline.units.len() {
+                                        pipeline.units.remove(idx);
+                                    }
+                                }
+                            }
+                            PipelinesAction::None => {}
                         }
                     }
                     Screen::Settings => {

@@ -1,6 +1,8 @@
 use crate::config::Config;
 use crate::error::Result;
+use crate::pipeline::{Pipeline, Unit, Provider};
 use egui::{Context, RichText, Ui};
+use uuid::Uuid;
 
 pub struct RecordingScreen {
     pub is_recording: bool,
@@ -385,4 +387,237 @@ impl SettingsScreen {
 pub enum SettingsAction {
     None,
     SaveConfig,
+}
+
+pub struct PipelinesScreen {
+    pub pipelines: Vec<Pipeline>,
+    pub selected_pipeline: Option<Uuid>,
+    pub editing_pipeline: Option<Pipeline>,
+    pub show_editor: bool,
+}
+
+impl PipelinesScreen {
+    pub fn from_config(config: &Config) -> Self {
+        Self {
+            pipelines: config.get_pipelines().to_vec(),
+            selected_pipeline: config.get_last_used_pipeline(),
+            editing_pipeline: None,
+            show_editor: false,
+        }
+    }
+
+    pub fn refresh_from_config(&mut self, config: &Config) {
+        self.pipelines = config.get_pipelines().to_vec();
+        self.selected_pipeline = config.get_last_used_pipeline();
+    }
+
+    pub fn ui(&mut self, ui: &mut Ui) -> PipelinesAction {
+        let mut action = PipelinesAction::None;
+
+        if self.show_editor {
+            // Pipeline Editor View
+            action = self.render_editor(ui);
+        } else {
+            // Pipeline List View
+            action = self.render_list(ui);
+        }
+
+        action
+    }
+
+    fn render_list(&mut self, ui: &mut Ui) -> PipelinesAction {
+        let mut action = PipelinesAction::None;
+
+        ui.heading("📋 Pipelines");
+        ui.add_space(10.0);
+
+        ui.horizontal(|ui| {
+            if ui.button("➕ New Pipeline").clicked() {
+                self.editing_pipeline = Some(Pipeline::new("New Pipeline".to_string()));
+                self.show_editor = true;
+            }
+        });
+
+        ui.add_space(10.0);
+        ui.separator();
+        ui.add_space(10.0);
+
+        // Sort pipelines by name
+        let mut sorted_pipelines = self.pipelines.clone();
+        sorted_pipelines.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+        if sorted_pipelines.is_empty() {
+            ui.label("No pipelines yet. Create one to get started!");
+        } else {
+            for pipeline in &sorted_pipelines {
+                ui.group(|ui| {
+                    ui.set_min_width(ui.available_width());
+
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.heading(&pipeline.name);
+                            ui.add_space(10.0);
+
+                            // Show unit count
+                            ui.label(format!("({} units)", pipeline.units.len()));
+                        });
+
+                        if let Some(desc) = &pipeline.description {
+                            ui.label(desc);
+                        }
+
+                        ui.add_space(5.0);
+
+                        ui.horizontal(|ui| {
+                            if ui.button("✏ Edit").clicked() {
+                                self.editing_pipeline = Some(pipeline.clone());
+                                self.show_editor = true;
+                            }
+
+                            if ui.button("🗑 Delete").clicked() {
+                                action = PipelinesAction::Delete(pipeline.id);
+                            }
+
+                            if ui.button("▶ Run").clicked() {
+                                action = PipelinesAction::Execute(pipeline.id);
+                            }
+                        });
+                    });
+                });
+
+                ui.add_space(5.0);
+            }
+        }
+
+        action
+    }
+
+    fn render_editor(&mut self, ui: &mut Ui) -> PipelinesAction {
+        let mut action = PipelinesAction::None;
+        let mut should_close = false;
+        let mut should_save = false;
+
+        if let Some(ref mut pipeline) = self.editing_pipeline {
+            ui.heading("✏ Pipeline Editor");
+            ui.add_space(10.0);
+
+            ui.horizontal(|ui| {
+                if ui.button("⬅ Back to List").clicked() {
+                    should_close = true;
+                }
+
+                if ui.button("💾 Save Pipeline").clicked() {
+                    should_save = true;
+                }
+            });
+
+            ui.add_space(10.0);
+            ui.separator();
+            ui.add_space(10.0);
+
+            // Pipeline metadata
+            ui.group(|ui| {
+                ui.vertical(|ui| {
+                    ui.label(RichText::new("Pipeline Details").strong());
+                    ui.add_space(5.0);
+
+                    ui.label("Name:");
+                    ui.text_edit_singleline(&mut pipeline.name);
+
+                    ui.add_space(5.0);
+
+                    ui.label("Description (optional):");
+                    let mut desc = pipeline.description.clone().unwrap_or_default();
+                    ui.text_edit_multiline(&mut desc);
+                    pipeline.description = if desc.is_empty() { None } else { Some(desc) };
+                });
+            });
+
+            ui.add_space(10.0);
+
+            // Units list
+            ui.group(|ui| {
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Processing Units").strong());
+                        ui.add_space(10.0);
+
+                        if ui.button("➕ Add Prompt Unit").clicked() {
+                            pipeline.add_unit(Unit::Prompt {
+                                id: Uuid::new_v4(),
+                                name: "New Prompt".to_string(),
+                                provider: Provider::OpenAI,
+                                model: "gpt-4".to_string(),
+                                system_prompt: String::new(),
+                                user_prompt_template: "{{input}}".to_string(),
+                            });
+                        }
+
+                        if ui.button("➕ Add Text Replacement").clicked() {
+                            pipeline.add_unit(Unit::TextReplacement {
+                                id: Uuid::new_v4(),
+                                name: "New Replacement".to_string(),
+                                find: String::new(),
+                                replace: String::new(),
+                                regex: false,
+                                case_sensitive: true,
+                            });
+                        }
+                    });
+
+                    ui.add_space(10.0);
+
+                    if pipeline.units.is_empty() {
+                        ui.label("No units yet. Add a prompt or text replacement unit.");
+                    } else {
+                        // Render each unit
+                        for (idx, unit) in pipeline.units.iter().enumerate() {
+                            ui.separator();
+                            ui.add_space(5.0);
+
+                            ui.horizontal(|ui| {
+                                ui.label(format!("{}. {}", idx + 1, unit.name()));
+
+                                if ui.button("🗑").clicked() {
+                                    action = PipelinesAction::RemoveUnit(idx);
+                                }
+                            });
+
+                            // Show unit type
+                            match unit {
+                                Unit::Prompt { provider, model, .. } => {
+                                    ui.label(format!("Type: Prompt ({:?} / {})", provider, model));
+                                }
+                                Unit::TextReplacement { find, replace, .. } => {
+                                    ui.label(format!("Type: Replace '{}' → '{}'", find, replace));
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        // Handle actions after borrowing ends
+        if should_save {
+            if let Some(pipeline) = self.editing_pipeline.clone() {
+                action = PipelinesAction::Save(pipeline);
+                self.show_editor = false;
+                self.editing_pipeline = None;
+            }
+        } else if should_close {
+            self.show_editor = false;
+            self.editing_pipeline = None;
+        }
+
+        action
+    }
+}
+
+pub enum PipelinesAction {
+    None,
+    Save(Pipeline),
+    Delete(Uuid),
+    Execute(Uuid),
+    RemoveUnit(usize),
 }

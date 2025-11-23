@@ -85,6 +85,7 @@ struct UnitBatch {
     model: Option<String>,
 }
 
+#[derive(Clone)]
 pub struct PipelineExecutor {
     client: TranscriptionClient,
     optimization_enabled: bool,
