@@ -3,6 +3,7 @@ use crate::autopaste::AutoPaster;
 use crate::config::Config;
 use crate::hotkey::HotkeyManager;
 use crate::logger::StructuredLogger;
+use crate::notifications::ToastManager;
 use crate::pipeline::{ExecutionResult, Pipeline, PipelineExecutor};
 use crate::transcription::{TranscriptionClient, TranscriptionProvider, TranscriptionRequest};
 use crate::ui::{RecordingAction, RecordingScreen, SettingsAction, SettingsScreen, PipelinesAction, PipelinesScreen};
@@ -31,6 +32,9 @@ pub struct App {
 
     // Logging
     logger: StructuredLogger,
+
+    // Toast notifications
+    toast_manager: ToastManager,
 
     // Pipeline state
     pipeline_executor: Option<PipelineExecutor>,
@@ -108,6 +112,7 @@ impl App {
             message_rx: rx,
             message_tx: tx,
             logger: StructuredLogger::new(),
+            toast_manager: ToastManager::new(),
             pipeline_executor,
             hotkey_manager,
             auto_paster,

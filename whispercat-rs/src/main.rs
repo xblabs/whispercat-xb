@@ -5,6 +5,7 @@ mod config;
 mod error;
 mod hotkey;
 mod logger;
+mod notifications;
 mod pipeline;
 mod transcription;
 mod ui;
