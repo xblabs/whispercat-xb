@@ -42,6 +42,10 @@ arboard = "3.3"
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
 global-hotkey = "0.5"
 
+# Windows-specific dependencies
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "wingdi", "winnt", "windef", "shellapi"] }
+
 # Note: System tray support requires platform-specific system libraries
 # Uncomment to enable on Windows/macOS with required dependencies installed
 # [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
