@@ -166,6 +166,8 @@ pub struct SettingsScreen {
     pub show_model_dropdown: bool,
     pub hotkey_input: String,
     pub recording_hotkey: bool,
+    pub testing_audio: bool,
+    pub test_audio_level: f32,
 }
 
 impl SettingsScreen {
@@ -192,6 +194,8 @@ impl SettingsScreen {
             show_model_dropdown: false,
             hotkey_input: config.hotkeys.record_toggle.clone(),
             recording_hotkey: false,
+            testing_audio: false,
+            test_audio_level: 0.0,
         }
     }
 
@@ -520,6 +524,93 @@ impl SettingsScreen {
             });
         });
 
+        ui.add_space(20.0);
+
+        // Audio Testing
+        ui.group(|ui| {
+            ui.vertical(|ui| {
+                ui.label(RichText::new("Audio Testing").strong());
+                ui.add_space(5.0);
+
+                ui.label("Test your microphone to ensure it's working correctly:");
+                ui.add_space(5.0);
+
+                ui.horizontal(|ui| {
+                    let button_text = if self.testing_audio {
+                        "⏹ Stop Test"
+                    } else {
+                        "🎤 Test Microphone"
+                    };
+
+                    if ui.button(button_text).clicked() {
+                        self.testing_audio = !self.testing_audio;
+                        if !self.testing_audio {
+                            self.test_audio_level = 0.0;
+                        }
+                        action = SettingsAction::TestAudio;
+                    }
+
+                    if self.testing_audio {
+                        ui.spinner();
+                        ui.label("Recording...");
+                    }
+                });
+
+                ui.add_space(5.0);
+
+                // Audio level indicator
+                ui.horizontal(|ui| {
+                    ui.label("Level:");
+                    let level_bar_width = 200.0;
+                    let level_normalized = self.test_audio_level.clamp(0.0, 1.0);
+
+                    // Draw audio level bar
+                    let (rect, _) = ui.allocate_exact_size(
+                        egui::vec2(level_bar_width, 20.0),
+                        egui::Sense::hover()
+                    );
+
+                    // Background
+                    ui.painter().rect_filled(
+                        rect,
+                        2.0,
+                        egui::Color32::from_gray(40)
+                    );
+
+                    // Level fill
+                    if level_normalized > 0.0 {
+                        let fill_width = rect.width() * level_normalized;
+                        let fill_rect = egui::Rect::from_min_size(
+                            rect.min,
+                            egui::vec2(fill_width, rect.height())
+                        );
+
+                        let color = if level_normalized > 0.8 {
+                            egui::Color32::from_rgb(255, 100, 100) // Red for high
+                        } else if level_normalized > 0.5 {
+                            egui::Color32::from_rgb(100, 255, 100) // Green for good
+                        } else {
+                            egui::Color32::from_rgb(100, 200, 255) // Blue for low
+                        };
+
+                        ui.painter().rect_filled(fill_rect, 2.0, color);
+                    }
+
+                    // Border
+                    ui.painter().rect_stroke(
+                        rect,
+                        2.0,
+                        egui::Stroke::new(1.0, egui::Color32::from_gray(100))
+                    );
+                });
+
+                ui.add_space(3.0);
+                ui.label("  • Speak into your microphone to see the level indicator");
+                ui.label("  • The bar should turn green when you speak at normal volume");
+                ui.label("  • If the bar stays low, check your microphone settings");
+            });
+        });
+
         action
     }
 
@@ -571,6 +662,7 @@ pub enum SettingsAction {
     None,
     SaveConfig,
     FetchModels,
+    TestAudio,
 }
 
 pub struct PipelinesScreen {

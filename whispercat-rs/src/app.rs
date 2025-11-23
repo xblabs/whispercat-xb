@@ -681,6 +681,15 @@ impl eframe::App for App {
                             SettingsAction::FetchModels => {
                                 self.fetch_models();
                             }
+                            SettingsAction::TestAudio => {
+                                // TODO: Implement audio testing
+                                // For now, just log that audio testing was toggled
+                                if self.settings_screen.testing_audio {
+                                    self.add_log("Audio testing started".to_string());
+                                } else {
+                                    self.add_log("Audio testing stopped".to_string());
+                                }
+                            }
                             SettingsAction::None => {}
                         }
                     }
