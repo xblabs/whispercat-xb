@@ -5,7 +5,7 @@ use crate::hotkey::HotkeyManager;
 use crate::logger::StructuredLogger;
 use crate::notifications::ToastManager;
 use crate::pipeline::{ExecutionResult, Pipeline, PipelineExecutor};
-use crate::transcription::{TranscriptionClient, TranscriptionProvider, TranscriptionRequest};
+use crate::transcription::{ModelsClient, TranscriptionClient, TranscriptionProvider, TranscriptionRequest};
 use crate::ui::{RecordingAction, RecordingScreen, SettingsAction, SettingsScreen, PipelinesAction, PipelinesScreen};
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -44,6 +44,9 @@ pub struct App {
 
     // Auto-paste
     auto_paster: Option<AutoPaster>,
+
+    // Models client
+    models_client: Option<ModelsClient>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -60,6 +63,7 @@ pub enum AppMessage {
     PipelineComplete { result: ExecutionResult },
     Error { message: String },
     Log { message: String },
+    ModelsFetched { models: Vec<String> },
 }
 
 impl App {
@@ -77,6 +81,14 @@ impl App {
         } else {
             None
         };
+
+        // Create models client for fetching available models
+        let models_client = Some(ModelsClient::new(
+            config.whisper.api_key.clone(),
+            config.whisper.faster_whisper_url.clone(),
+            config.whisper.openwebui_url.clone(),
+            config.whisper.openwebui_api_key.clone(),
+        ));
 
         // Initialize hotkey manager
         let mut hotkey_manager = HotkeyManager::new().ok();
@@ -116,6 +128,7 @@ impl App {
             pipeline_executor,
             hotkey_manager,
             auto_paster,
+            models_client,
         }
     }
 
@@ -390,6 +403,10 @@ impl App {
                 AppMessage::Log { message } => {
                     self.add_log(message);
                 }
+                AppMessage::ModelsFetched { models } => {
+                    self.settings_screen.set_available_models(models);
+                    self.add_log("Models fetched successfully".to_string());
+                }
             }
         }
 
@@ -413,6 +430,48 @@ impl App {
                 self.pipeline_executor =
                     Some(PipelineExecutor::new(self.config.whisper.api_key.clone()));
             }
+
+            // Update models client with new configuration
+            self.models_client = Some(ModelsClient::new(
+                self.config.whisper.api_key.clone(),
+                self.config.whisper.faster_whisper_url.clone(),
+                self.config.whisper.openwebui_url.clone(),
+                self.config.whisper.openwebui_api_key.clone(),
+            ));
+        }
+    }
+
+    fn fetch_models(&mut self) {
+        if let Some(client) = self.models_client.clone() {
+            // Determine provider from settings
+            let provider = match self.settings_screen.provider_selection {
+                1 => TranscriptionProvider::FasterWhisper,
+                2 => TranscriptionProvider::OpenWebUI,
+                _ => TranscriptionProvider::OpenAI,
+            };
+
+            self.settings_screen.set_fetching_models(true);
+            self.add_log(format!("Fetching models for {:?}...", provider));
+
+            let tx = self.message_tx.clone();
+
+            tokio::spawn(async move {
+                match client.fetch_models(provider).await {
+                    Ok(model_infos) => {
+                        let models: Vec<String> = model_infos.iter().map(|m| m.id.clone()).collect();
+                        tracing::info!("Fetched {} models", models.len());
+                        tx.send(AppMessage::ModelsFetched { models }).ok();
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to fetch models: {}", e);
+                        tx.send(AppMessage::Error {
+                            message: format!("Failed to fetch models: {}", e),
+                        }).ok();
+                    }
+                }
+            });
+        } else {
+            self.add_log("Models client not initialized".to_string());
         }
     }
 }
@@ -573,6 +632,9 @@ impl eframe::App for App {
                         match action {
                             SettingsAction::SaveConfig => {
                                 self.save_config();
+                            }
+                            SettingsAction::FetchModels => {
+                                self.fetch_models();
                             }
                             SettingsAction::None => {}
                         }

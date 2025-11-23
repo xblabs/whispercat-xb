@@ -161,6 +161,9 @@ pub struct SettingsScreen {
     pub min_silence_duration: u32,
     pub silence_removal_enabled: bool,
     pub auto_paste: bool,
+    pub available_models: Vec<String>,
+    pub fetching_models: bool,
+    pub show_model_dropdown: bool,
 }
 
 impl SettingsScreen {
@@ -182,7 +185,20 @@ impl SettingsScreen {
             min_silence_duration: config.silence_removal.min_duration_ms,
             silence_removal_enabled: config.silence_removal.enabled,
             auto_paste: config.ui.auto_paste,
+            available_models: Vec::new(),
+            fetching_models: false,
+            show_model_dropdown: false,
         }
+    }
+
+    pub fn set_available_models(&mut self, models: Vec<String>) {
+        self.available_models = models;
+        self.fetching_models = false;
+        self.show_model_dropdown = !self.available_models.is_empty();
+    }
+
+    pub fn set_fetching_models(&mut self, fetching: bool) {
+        self.fetching_models = fetching;
     }
 
     pub fn ui(&mut self, ui: &mut Ui) -> SettingsAction {
@@ -234,13 +250,35 @@ impl SettingsScreen {
                         ui.add_space(5.0);
 
                         ui.label("Model:");
-                        let response = ui.add(
-                            egui::TextEdit::singleline(&mut self.model_input)
-                                .hint_text("whisper-1"),
-                        );
-                        if response.changed() {
-                            action = SettingsAction::SaveConfig;
-                        }
+                        ui.horizontal(|ui| {
+                            if self.show_model_dropdown && !self.available_models.is_empty() {
+                                egui::ComboBox::from_id_source("model_selector_openai")
+                                    .selected_text(&self.model_input)
+                                    .show_ui(ui, |ui| {
+                                        for model in &self.available_models {
+                                            if ui.selectable_value(&mut self.model_input, model.clone(), model).clicked() {
+                                                action = SettingsAction::SaveConfig;
+                                            }
+                                        }
+                                    });
+                            } else {
+                                let response = ui.add(
+                                    egui::TextEdit::singleline(&mut self.model_input)
+                                        .hint_text("whisper-1"),
+                                );
+                                if response.changed() {
+                                    action = SettingsAction::SaveConfig;
+                                }
+                            }
+
+                            if ui.add_enabled(!self.fetching_models, egui::Button::new("🔄 Fetch Models")).clicked() {
+                                action = SettingsAction::FetchModels;
+                            }
+
+                            if self.fetching_models {
+                                ui.spinner();
+                            }
+                        });
                     });
                 });
             }
@@ -263,13 +301,35 @@ impl SettingsScreen {
                         ui.add_space(5.0);
 
                         ui.label("Model:");
-                        let response = ui.add(
-                            egui::TextEdit::singleline(&mut self.model_input)
-                                .hint_text("Systran/faster-whisper-large-v3"),
-                        );
-                        if response.changed() {
-                            action = SettingsAction::SaveConfig;
-                        }
+                        ui.horizontal(|ui| {
+                            if self.show_model_dropdown && !self.available_models.is_empty() {
+                                egui::ComboBox::from_id_source("model_selector_faster_whisper")
+                                    .selected_text(&self.model_input)
+                                    .show_ui(ui, |ui| {
+                                        for model in &self.available_models {
+                                            if ui.selectable_value(&mut self.model_input, model.clone(), model).clicked() {
+                                                action = SettingsAction::SaveConfig;
+                                            }
+                                        }
+                                    });
+                            } else {
+                                let response = ui.add(
+                                    egui::TextEdit::singleline(&mut self.model_input)
+                                        .hint_text("Systran/faster-whisper-large-v3"),
+                                );
+                                if response.changed() {
+                                    action = SettingsAction::SaveConfig;
+                                }
+                            }
+
+                            if ui.add_enabled(!self.fetching_models && !self.faster_whisper_url.is_empty(), egui::Button::new("🔄 Fetch Models")).clicked() {
+                                action = SettingsAction::FetchModels;
+                            }
+
+                            if self.fetching_models {
+                                ui.spinner();
+                            }
+                        });
                     });
                 });
             }
@@ -304,13 +364,35 @@ impl SettingsScreen {
                         ui.add_space(5.0);
 
                         ui.label("Model:");
-                        let response = ui.add(
-                            egui::TextEdit::singleline(&mut self.model_input)
-                                .hint_text("whisper-1"),
-                        );
-                        if response.changed() {
-                            action = SettingsAction::SaveConfig;
-                        }
+                        ui.horizontal(|ui| {
+                            if self.show_model_dropdown && !self.available_models.is_empty() {
+                                egui::ComboBox::from_id_source("model_selector_openwebui")
+                                    .selected_text(&self.model_input)
+                                    .show_ui(ui, |ui| {
+                                        for model in &self.available_models {
+                                            if ui.selectable_value(&mut self.model_input, model.clone(), model).clicked() {
+                                                action = SettingsAction::SaveConfig;
+                                            }
+                                        }
+                                    });
+                            } else {
+                                let response = ui.add(
+                                    egui::TextEdit::singleline(&mut self.model_input)
+                                        .hint_text("whisper-1"),
+                                );
+                                if response.changed() {
+                                    action = SettingsAction::SaveConfig;
+                                }
+                            }
+
+                            if ui.add_enabled(!self.fetching_models && !self.openwebui_url.is_empty() && !self.openwebui_api_key.is_empty(), egui::Button::new("🔄 Fetch Models")).clicked() {
+                                action = SettingsAction::FetchModels;
+                            }
+
+                            if self.fetching_models {
+                                ui.spinner();
+                            }
+                        });
                     });
                 });
             }
@@ -425,6 +507,7 @@ impl SettingsScreen {
 pub enum SettingsAction {
     None,
     SaveConfig,
+    FetchModels,
 }
 
 pub struct PipelinesScreen {

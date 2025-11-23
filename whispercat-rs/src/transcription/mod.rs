@@ -1,6 +1,7 @@
 pub mod types;
 pub mod whisper;
 pub mod client;
+pub mod models;
 
 pub use types::{
     ChatCompletionRequest, ChatCompletionResponse, ChatMessage, TranscriptionProvider,
@@ -8,3 +9,4 @@ pub use types::{
 };
 pub use whisper::WhisperClient;
 pub use client::TranscriptionClient;
+pub use models::{ModelInfo, ModelsClient};
