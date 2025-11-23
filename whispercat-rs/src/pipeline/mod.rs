@@ -196,6 +196,8 @@ impl Unit {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum Provider {
     OpenAI,
+    OpenWebUI,
+    FasterWhisper, // For future use
 }
 
 /// A batch of units that can potentially be optimized into a single API call
@@ -581,14 +583,24 @@ impl PipelineExecutor {
     async fn execute_unit_type(&self, input: &str, unit_type: &UnitType) -> Result<String> {
         match unit_type {
             UnitType::Prompt {
+                provider,
                 system_prompt,
                 user_prompt_template,
                 model,
-                ..
             } => {
+                use crate::transcription::TranscriptionProvider;
+
                 let user_prompt = user_prompt_template.replace("{{input}}", input);
+
+                // Convert pipeline Provider to TranscriptionProvider
+                let transcription_provider = match provider {
+                    Provider::OpenAI => TranscriptionProvider::OpenAI,
+                    Provider::OpenWebUI => TranscriptionProvider::OpenWebUI,
+                    Provider::FasterWhisper => TranscriptionProvider::FasterWhisper,
+                };
+
                 self.client
-                    .chat_completion(system_prompt, &user_prompt, model)
+                    .chat_completion_with_provider(system_prompt, &user_prompt, model, transcription_provider)
                     .await
             }
             UnitType::TextReplacement {

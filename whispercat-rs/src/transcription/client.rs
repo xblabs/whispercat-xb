@@ -272,7 +272,40 @@ impl TranscriptionClient {
     }
 
     /// For pipeline post-processing (kept from original WhisperClient)
+    /// Chat completion using OpenAI (default, for backward compatibility)
     pub async fn chat_completion(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        model: &str,
+    ) -> Result<String> {
+        self.chat_completion_openai(system_prompt, user_prompt, model).await
+    }
+
+    /// Chat completion with provider selection
+    pub async fn chat_completion_with_provider(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        model: &str,
+        provider: TranscriptionProvider,
+    ) -> Result<String> {
+        match provider {
+            TranscriptionProvider::OpenAI => {
+                self.chat_completion_openai(system_prompt, user_prompt, model).await
+            }
+            TranscriptionProvider::OpenWebUI => {
+                self.chat_completion_openwebui(system_prompt, user_prompt, model).await
+            }
+            TranscriptionProvider::FasterWhisper => {
+                // Faster-Whisper doesn't support chat completion, fallback to OpenAI
+                tracing::warn!("Faster-Whisper doesn't support chat completion, using OpenAI instead");
+                self.chat_completion_openai(system_prompt, user_prompt, model).await
+            }
+        }
+    }
+
+    async fn chat_completion_openai(
         &self,
         system_prompt: &str,
         user_prompt: &str,
@@ -296,7 +329,7 @@ impl TranscriptionClient {
             max_tokens: Some(2000),
         };
 
-        tracing::info!("Sending chat completion request (model: {})", model);
+        tracing::info!("Sending OpenAI chat completion request (model: {})", model);
 
         let response = self
             .client
@@ -310,7 +343,7 @@ impl TranscriptionClient {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            tracing::error!("API error {}: {}", status, body);
+            tracing::error!("OpenAI API error {}: {}", status, body);
             return Err(WhisperCatError::ApiError {
                 status: status.as_u16(),
                 message: body,
@@ -324,7 +357,70 @@ impl TranscriptionClient {
         } else {
             Err(WhisperCatError::ApiError {
                 status: 500,
-                message: "No response from API".to_string(),
+                message: "No response from OpenAI API".to_string(),
+            })
+        }
+    }
+
+    async fn chat_completion_openwebui(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        model: &str,
+    ) -> Result<String> {
+        use crate::transcription::types::{ChatCompletionRequest, ChatCompletionResponse, ChatMessage};
+
+        let url = self.openwebui_url.as_ref()
+            .ok_or_else(|| WhisperCatError::ConfigError("Open WebUI URL not configured".to_string()))?;
+        let api_key = self.openwebui_api_key.as_ref()
+            .ok_or_else(|| WhisperCatError::ConfigError("Open WebUI API key not configured".to_string()))?;
+
+        let request = ChatCompletionRequest {
+            model: model.to_string(),
+            messages: vec![
+                ChatMessage {
+                    role: "system".to_string(),
+                    content: system_prompt.to_string(),
+                },
+                ChatMessage {
+                    role: "user".to_string(),
+                    content: user_prompt.to_string(),
+                },
+            ],
+            temperature: Some(0.7),
+            max_tokens: Some(2000),
+        };
+
+        tracing::info!("Sending Open WebUI chat completion request (model: {})", model);
+
+        let chat_url = format!("{}/api/chat/completions", url.trim_end_matches('/'));
+        let response = self
+            .client
+            .post(&chat_url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            tracing::error!("Open WebUI API error {}: {}", status, body);
+            return Err(WhisperCatError::ApiError {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let result: ChatCompletionResponse = response.json().await?;
+
+        if let Some(choice) = result.choices.first() {
+            Ok(choice.message.content.clone())
+        } else {
+            Err(WhisperCatError::ApiError {
+                status: 500,
+                message: "No response from Open WebUI API".to_string(),
             })
         }
     }
