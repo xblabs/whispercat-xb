@@ -8,6 +8,7 @@ mod logger;
 mod notifications;
 mod pipeline;
 mod transcription;
+mod tray;
 mod ui;
 
 use app::App;

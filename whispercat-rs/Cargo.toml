@@ -42,5 +42,10 @@ arboard = "3.3"
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
 global-hotkey = "0.5"
 
+# Note: System tray support requires platform-specific system libraries
+# Uncomment to enable on Windows/macOS with required dependencies installed
+# [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
+# tray-icon = "0.14"
+
 [dev-dependencies]
 criterion = "0.5"

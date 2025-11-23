@@ -6,6 +6,7 @@ use crate::logger::StructuredLogger;
 use crate::notifications::ToastManager;
 use crate::pipeline::{ExecutionResult, Pipeline, PipelineExecutor};
 use crate::transcription::{ModelsClient, TranscriptionClient, TranscriptionProvider, TranscriptionRequest};
+use crate::tray::TrayManager;
 use crate::ui::{RecordingAction, RecordingScreen, SettingsAction, SettingsScreen, PipelinesAction, PipelinesScreen};
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -47,6 +48,9 @@ pub struct App {
 
     // Models client
     models_client: Option<ModelsClient>,
+
+    // System tray
+    tray_manager: Option<TrayManager>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -110,6 +114,14 @@ impl App {
             tracing::warn!("Failed to initialize auto-paster - clipboard functionality may be limited");
         }
 
+        // Initialize system tray
+        let tray_manager = TrayManager::new().ok();
+        if let Some(ref tray) = tray_manager {
+            tracing::info!("System tray initialized");
+        } else {
+            tracing::warn!("Failed to initialize system tray - tray icon will not be available");
+        }
+
         let mut recording_screen = RecordingScreen::default();
         recording_screen.refresh_pipelines(&config);
 
@@ -129,6 +141,7 @@ impl App {
             hotkey_manager,
             auto_paster,
             models_client,
+            tray_manager,
         }
     }
 
@@ -491,6 +504,38 @@ impl eframe::App for App {
                     self.start_recording();
                 }
             }
+        }
+
+        // Check for system tray events
+        let tray_event = self.tray_manager.as_ref().and_then(|t| t.check_events());
+        if let Some(event) = tray_event {
+            use crate::tray::TrayEvent;
+            match event {
+                TrayEvent::Show => {
+                    // Note: eframe doesn't provide direct window visibility control
+                    // This would require platform-specific code
+                    tracing::info!("Tray: Show window requested");
+                }
+                TrayEvent::Hide => {
+                    tracing::info!("Tray: Hide window requested");
+                }
+                TrayEvent::ToggleRecording => {
+                    if self.recording_screen.is_recording {
+                        self.stop_recording();
+                    } else if !self.recording_screen.is_transcribing {
+                        self.start_recording();
+                    }
+                }
+                TrayEvent::Exit => {
+                    tracing::info!("Tray: Exit requested");
+                    std::process::exit(0);
+                }
+            }
+        }
+
+        // Update tray state based on recording state
+        if let Some(ref mut tray) = self.tray_manager {
+            tray.update_recording_state(self.recording_screen.is_recording);
         }
 
         // Top panel with navigation
