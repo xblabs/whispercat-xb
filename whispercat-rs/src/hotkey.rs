@@ -175,20 +175,20 @@ mod tests {
     #[test]
     fn test_parse_hotkey() {
         let hotkey = HotkeyManager::parse_hotkey("Ctrl+Shift+R").unwrap();
-        assert!(hotkey.mods().contains(Modifiers::CONTROL));
-        assert!(hotkey.mods().contains(Modifiers::SHIFT));
+        assert!(hotkey.mods.contains(Modifiers::CONTROL));
+        assert!(hotkey.mods.contains(Modifiers::SHIFT));
     }
 
     #[test]
     fn test_parse_single_key() {
         let hotkey = HotkeyManager::parse_hotkey("F1").unwrap();
-        assert_eq!(hotkey.key(), Code::F1);
+        assert_eq!(hotkey.key, Code::F1);
     }
 
     #[test]
     fn test_parse_alt_key() {
         let hotkey = HotkeyManager::parse_hotkey("Alt+F4").unwrap();
-        assert!(hotkey.mods().contains(Modifiers::ALT));
-        assert_eq!(hotkey.key(), Code::F4);
+        assert!(hotkey.mods.contains(Modifiers::ALT));
+        assert_eq!(hotkey.key, Code::F4);
     }
 }
