@@ -10,6 +10,8 @@ pub struct RecordingScreen {
     pub transcription_result: Option<String>,
     pub is_transcribing: bool,
     pub error_message: Option<String>,
+    pub selected_pipeline_id: Option<Uuid>,
+    pub available_pipelines: Vec<Pipeline>,
 }
 
 impl Default for RecordingScreen {
@@ -20,7 +22,16 @@ impl Default for RecordingScreen {
             transcription_result: None,
             is_transcribing: false,
             error_message: None,
+            selected_pipeline_id: None,
+            available_pipelines: Vec::new(),
         }
+    }
+}
+
+impl RecordingScreen {
+    pub fn refresh_pipelines(&mut self, config: &Config) {
+        self.available_pipelines = config.get_pipelines().to_vec();
+        self.selected_pipeline_id = config.get_last_used_pipeline();
     }
 }
 
@@ -93,8 +104,35 @@ impl RecordingScreen {
                             ui.output_mut(|o| o.copied_text = text.clone());
                         }
 
-                        if ui.button("🔄 Process with Pipeline").clicked() {
-                            action = RecordingAction::ProcessPipeline;
+                        // Pipeline selector
+                        if !self.available_pipelines.is_empty() {
+                            ui.separator();
+                            ui.label("Pipeline:");
+
+                            egui::ComboBox::from_id_source("pipeline_selector")
+                                .selected_text(
+                                    self.selected_pipeline_id
+                                        .and_then(|id| {
+                                            self.available_pipelines
+                                                .iter()
+                                                .find(|p| p.id == id)
+                                                .map(|p| p.name.as_str())
+                                        })
+                                        .unwrap_or("Select pipeline...")
+                                )
+                                .show_ui(ui, |ui| {
+                                    for pipeline in &self.available_pipelines {
+                                        ui.selectable_value(
+                                            &mut self.selected_pipeline_id,
+                                            Some(pipeline.id),
+                                            &pipeline.name
+                                        );
+                                    }
+                                });
+
+                            if ui.button("▶ Run Pipeline").clicked() && self.selected_pipeline_id.is_some() {
+                                action = RecordingAction::ProcessPipeline;
+                            }
                         }
                     });
                 });

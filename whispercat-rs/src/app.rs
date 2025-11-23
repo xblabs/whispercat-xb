@@ -94,11 +94,14 @@ impl App {
             tracing::warn!("Failed to initialize auto-paster - clipboard functionality may be limited");
         }
 
+        let mut recording_screen = RecordingScreen::default();
+        recording_screen.refresh_pipelines(&config);
+
         Self {
             current_screen: Screen::Recording,
             recorder: None,
             last_recording_path: None,
-            recording_screen: RecordingScreen::default(),
+            recording_screen,
             settings_screen,
             pipelines_screen: PipelinesScreen::from_config(&config),
             config,
@@ -353,6 +356,7 @@ impl App {
                 }
                 AppMessage::PipelineComplete { result } => {
                     self.recording_screen.transcription_result = Some(result.output.clone());
+                    self.recording_screen.is_transcribing = false;
                     self.add_log(format!(
                         "Pipeline complete in {:?}",
                         result.total_duration
@@ -448,7 +452,47 @@ impl eframe::App for App {
                                 self.stop_recording();
                             }
                             RecordingAction::ProcessPipeline => {
-                                // TODO: Show pipeline selection dialog
+                                if let Some(pipeline_id) = self.recording_screen.selected_pipeline_id {
+                                    if let Some(pipeline) = self.config.get_pipeline(pipeline_id).cloned() {
+                                        if let Some(text) = self.recording_screen.transcription_result.clone() {
+                                            if let Some(ref executor) = self.pipeline_executor {
+                                                let executor_clone = executor.clone();
+                                                let pipeline_clone = pipeline.clone();
+                                                let tx = self.message_tx.clone();
+
+                                                // Save the last used pipeline
+                                                self.config.set_last_used_pipeline(Some(pipeline_id));
+                                                if let Err(e) = self.config.save() {
+                                                    self.add_log(format!("Failed to save config: {}", e));
+                                                }
+
+                                                self.recording_screen.is_transcribing = true;
+                                                self.add_log(format!("Executing pipeline: {}", pipeline.name));
+
+                                                tokio::spawn(async move {
+                                                    match executor_clone.execute(text, &pipeline_clone).await {
+                                                        Ok(result) => {
+                                                            tx.send(AppMessage::PipelineComplete { result }).ok();
+                                                        }
+                                                        Err(e) => {
+                                                            tx.send(AppMessage::Error {
+                                                                message: format!("Pipeline failed: {}", e),
+                                                            }).ok();
+                                                        }
+                                                    }
+                                                });
+                                            } else {
+                                                self.add_log("No pipeline executor available - check API key in Settings".to_string());
+                                            }
+                                        } else {
+                                            self.add_log("No transcription result to process".to_string());
+                                        }
+                                    } else {
+                                        self.add_log("Pipeline not found".to_string());
+                                    }
+                                } else {
+                                    self.add_log("No pipeline selected".to_string());
+                                }
                             }
                             RecordingAction::None => {}
                         }
@@ -463,6 +507,7 @@ impl eframe::App for App {
                                 } else {
                                     self.add_log("Pipeline saved successfully".to_string());
                                     self.pipelines_screen.refresh_from_config(&self.config);
+                                    self.recording_screen.refresh_pipelines(&self.config);
                                 }
                             }
                             PipelinesAction::Delete(id) => {
@@ -472,6 +517,7 @@ impl eframe::App for App {
                                 } else {
                                     self.add_log("Pipeline deleted successfully".to_string());
                                     self.pipelines_screen.refresh_from_config(&self.config);
+                                    self.recording_screen.refresh_pipelines(&self.config);
                                 }
                             }
                             PipelinesAction::Execute(id) => {
