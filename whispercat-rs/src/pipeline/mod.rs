@@ -5,14 +5,84 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use uuid::Uuid;
 
+/// A standalone processing unit that can be reused across multiple pipelines
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProcessingUnit {
+    pub id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    pub unit_type: UnitType,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl ProcessingUnit {
+    pub fn new(name: String, unit_type: UnitType) -> Self {
+        let now = Utc::now();
+        Self {
+            id: Uuid::new_v4(),
+            name,
+            description: None,
+            unit_type,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}
+
+/// The actual unit configuration (Prompt or TextReplacement)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum UnitType {
+    Prompt {
+        provider: Provider,
+        model: String,
+        system_prompt: String,
+        user_prompt_template: String,
+    },
+    TextReplacement {
+        find: String,
+        replace: String,
+        regex: bool,
+        case_sensitive: bool,
+    },
+}
+
+/// Reference to a ProcessingUnit within a pipeline
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PipelineUnitReference {
+    pub unit_id: Uuid,
+    pub enabled: bool,
+}
+
+impl PipelineUnitReference {
+    pub fn new(unit_id: Uuid) -> Self {
+        Self {
+            unit_id,
+            enabled: true,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Pipeline {
     pub id: Uuid,
     pub name: String,
     pub description: Option<String>,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    // New reference-based system
+    #[serde(default)]
+    pub unit_refs: Vec<PipelineUnitReference>,
+    // Legacy inline units (for backward compatibility)
+    #[serde(default)]
     pub units: Vec<Unit>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Pipeline {
@@ -22,18 +92,33 @@ impl Pipeline {
             id: Uuid::new_v4(),
             name,
             description: None,
+            enabled: true,
+            unit_refs: Vec::new(),
             units: Vec::new(),
             created_at: now,
             updated_at: now,
         }
     }
 
+    // New ref-based methods
+    pub fn add_unit_ref(&mut self, unit_id: Uuid) {
+        self.unit_refs.push(PipelineUnitReference::new(unit_id));
+        self.updated_at = Utc::now();
+    }
+
+    pub fn add_unit_ref_with_state(&mut self, unit_id: Uuid, enabled: bool) {
+        self.unit_refs.push(PipelineUnitReference { unit_id, enabled });
+        self.updated_at = Utc::now();
+    }
+
+    // Legacy methods (for backward compatibility)
     pub fn add_unit(&mut self, unit: Unit) {
         self.units.push(unit);
         self.updated_at = Utc::now();
     }
 }
 
+// Legacy Unit enum for backward compatibility
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Unit {
@@ -67,6 +152,43 @@ impl Unit {
         match self {
             Unit::Prompt { id, .. } => *id,
             Unit::TextReplacement { id, .. } => *id,
+        }
+    }
+
+    /// Convert legacy Unit to ProcessingUnit
+    pub fn to_processing_unit(self) -> ProcessingUnit {
+        let now = Utc::now();
+        match self {
+            Unit::Prompt { id, name, provider, model, system_prompt, user_prompt_template } => {
+                ProcessingUnit {
+                    id,
+                    name,
+                    description: None,
+                    unit_type: UnitType::Prompt {
+                        provider,
+                        model,
+                        system_prompt,
+                        user_prompt_template,
+                    },
+                    created_at: now,
+                    updated_at: now,
+                }
+            }
+            Unit::TextReplacement { id, name, find, replace, regex, case_sensitive } => {
+                ProcessingUnit {
+                    id,
+                    name,
+                    description: None,
+                    unit_type: UnitType::TextReplacement {
+                        find,
+                        replace,
+                        regex,
+                        case_sensitive,
+                    },
+                    created_at: now,
+                    updated_at: now,
+                }
+            }
         }
     }
 }
@@ -104,6 +226,83 @@ impl PipelineExecutor {
         self
     }
 
+    /// Execute pipeline with processing unit references
+    pub async fn execute_with_units(
+        &self,
+        input: String,
+        pipeline: &Pipeline,
+        units: &[ProcessingUnit],
+    ) -> Result<ExecutionResult> {
+        // Check if pipeline is enabled
+        if !pipeline.enabled {
+            tracing::info!("Pipeline '{}' is disabled, skipping execution", pipeline.name);
+            return Ok(ExecutionResult {
+                output: input,
+                log_entries: Vec::new(),
+                total_duration: std::time::Duration::from_secs(0),
+            });
+        }
+
+        // Resolve unit references and filter enabled ones
+        let mut resolved_units = Vec::new();
+        for unit_ref in &pipeline.unit_refs {
+            if !unit_ref.enabled {
+                continue; // Skip disabled units
+            }
+
+            if let Some(unit) = units.iter().find(|u| u.id == unit_ref.unit_id) {
+                resolved_units.push(unit);
+            } else {
+                tracing::warn!("Unit {} not found, skipping", unit_ref.unit_id);
+            }
+        }
+
+        if resolved_units.is_empty() {
+            tracing::info!("No enabled units in pipeline '{}'", pipeline.name);
+            return Ok(ExecutionResult {
+                output: input,
+                log_entries: Vec::new(),
+                total_duration: std::time::Duration::from_secs(0),
+            });
+        }
+
+        let mut current_text = input.clone();
+        let mut log_entries = Vec::new();
+        let start_time = Instant::now();
+
+        tracing::info!("Executing pipeline: {} ({} enabled units)", pipeline.name, resolved_units.len());
+
+        // Execute each unit in sequence
+        for (idx, unit) in resolved_units.iter().enumerate() {
+            let unit_start = Instant::now();
+            tracing::info!("  [{}/{}] {}", idx + 1, resolved_units.len(), unit.name);
+
+            let output = self.execute_unit_type(&current_text, &unit.unit_type).await?;
+            let duration = unit_start.elapsed();
+
+            log_entries.push(ExecutionLogEntry {
+                timestamp: Utc::now(),
+                unit_name: unit.name.clone(),
+                input: current_text.clone(),
+                output: output.clone(),
+                duration,
+                optimized: false,
+            });
+
+            current_text = output;
+        }
+
+        let total_duration = start_time.elapsed();
+        tracing::info!("Pipeline execution complete in {:?}", total_duration);
+
+        Ok(ExecutionResult {
+            output: current_text,
+            log_entries,
+            total_duration,
+        })
+    }
+
+    /// Legacy execute method for backward compatibility
     pub async fn execute(&self, input: String, pipeline: &Pipeline) -> Result<ExecutionResult> {
         let mut current_text = input.clone();
         let mut log_entries = Vec::new();
@@ -354,6 +553,49 @@ impl PipelineExecutor {
                 regex,
                 case_sensitive,
                 ..
+            } => {
+                if *regex {
+                    let re = if *case_sensitive {
+                        regex::Regex::new(find)?
+                    } else {
+                        regex::RegexBuilder::new(find)
+                            .case_insensitive(true)
+                            .build()?
+                    };
+                    Ok(re.replace_all(input, replace.as_str()).to_string())
+                } else {
+                    Ok(if *case_sensitive {
+                        input.replace(find, replace)
+                    } else {
+                        let re = regex::RegexBuilder::new(&regex::escape(find))
+                            .case_insensitive(true)
+                            .build()?;
+                        re.replace_all(input, replace.as_str()).to_string()
+                    })
+                }
+            }
+        }
+    }
+
+    /// Execute a UnitType (from ProcessingUnit)
+    async fn execute_unit_type(&self, input: &str, unit_type: &UnitType) -> Result<String> {
+        match unit_type {
+            UnitType::Prompt {
+                system_prompt,
+                user_prompt_template,
+                model,
+                ..
+            } => {
+                let user_prompt = user_prompt_template.replace("{{input}}", input);
+                self.client
+                    .chat_completion(system_prompt, &user_prompt, model)
+                    .await
+            }
+            UnitType::TextReplacement {
+                find,
+                replace,
+                regex,
+                case_sensitive,
             } => {
                 if *regex {
                     let re = if *case_sensitive {

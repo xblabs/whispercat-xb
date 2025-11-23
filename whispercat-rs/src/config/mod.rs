@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::pipeline::Pipeline;
+use crate::pipeline::{Pipeline, ProcessingUnit};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -11,6 +11,8 @@ pub struct Config {
     pub silence_removal: SilenceRemovalConfig,
     pub hotkeys: HotkeyConfig,
     pub ui: UiConfig,
+    #[serde(default)]
+    pub processing_units: Vec<ProcessingUnit>,
     #[serde(default)]
     pub pipelines: Vec<Pipeline>,
     #[serde(default)]
@@ -25,6 +27,7 @@ impl Default for Config {
             silence_removal: SilenceRemovalConfig::default(),
             hotkeys: HotkeyConfig::default(),
             ui: UiConfig::default(),
+            processing_units: Vec::new(),
             pipelines: Vec::new(),
             last_used_pipeline: None,
         }
@@ -67,6 +70,37 @@ impl Config {
             .unwrap_or_else(|| PathBuf::from("."))
             .join("whispercat")
             .join("config.toml")
+    }
+
+    // Processing Unit management methods
+
+    /// Returns all processing units
+    pub fn get_processing_units(&self) -> &[ProcessingUnit] {
+        &self.processing_units
+    }
+
+    /// Gets a processing unit by UUID
+    pub fn get_processing_unit(&self, id: Uuid) -> Option<&ProcessingUnit> {
+        self.processing_units.iter().find(|u| u.id == id)
+    }
+
+    /// Saves or updates a processing unit
+    pub fn save_processing_unit(&mut self, unit: ProcessingUnit) {
+        if let Some(existing) = self.processing_units.iter_mut().find(|u| u.id == unit.id) {
+            *existing = unit;
+        } else {
+            self.processing_units.push(unit);
+        }
+    }
+
+    /// Deletes a processing unit by UUID
+    pub fn delete_processing_unit(&mut self, id: Uuid) {
+        self.processing_units.retain(|u| u.id != id);
+
+        // Remove references from all pipelines
+        for pipeline in &mut self.pipelines {
+            pipeline.unit_refs.retain(|r| r.unit_id != id);
+        }
     }
 
     // Pipeline management methods
