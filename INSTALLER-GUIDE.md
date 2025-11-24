@@ -38,7 +38,35 @@ powershell -ExecutionPolicy Bypass -File build-installer.ps1
 
 ---
 
-### Option 2: Portable Package (No Install Required)
+### Option 2: Portable EXE (Taskbar-Friendly) ⭐ NEW
+
+Creates a standalone `.exe` launcher that's perfect for pinning to taskbar:
+- Single .exe file (wraps the JAR)
+- Can be pinned to Windows taskbar
+- No installation needed
+- Requires users to have Java 11+ installed
+
+**Build:**
+```batch
+# Using batch file
+create-exe-launcher.bat
+
+# OR using PowerShell (recommended)
+powershell -ExecutionPolicy Bypass -File create-portable-exe.ps1
+```
+
+**Output:** `WhisperCat.exe`
+
+**Features:**
+- ✅ Pin to taskbar (right-click → Pin to taskbar)
+- ✅ Proper Windows icon
+- ✅ Single instance (won't open multiple copies)
+- ✅ Version info in file properties
+- ✅ Settings persist to `%APPDATA%\WhisperCat\`
+
+---
+
+### Option 3: Portable ZIP Package (Legacy)
 
 Creates a ZIP file with JAR + launcher script:
 - No installation needed
@@ -57,9 +85,11 @@ create-portable-package.bat
 - `WhisperCat.bat` - Launcher script
 - `README.txt` - Instructions
 
+**Note:** Use Option 2 (Portable EXE) for better taskbar integration!
+
 ---
 
-### Option 3: Simple Launcher Script
+### Option 4: Simple Launcher Script
 
 For development or quick testing:
 
@@ -72,7 +102,7 @@ This launches the JAR directly from the `target/` directory.
 
 ---
 
-### Option 4: Bundled JRE (No Java Installation Required)
+### Option 5: Bundled JRE (No Java Installation Required)
 
 **Already available via GitHub Actions!**
 
@@ -93,13 +123,20 @@ The CI/CD automatically creates `WhisperCat-Windows-with-jre-non-installer.zip` 
 
 ## Quick Start for Users
 
-### If you build the installer:
+### If you build the full installer:
 1. Run `WhisperCat-1.6.0.exe`
 2. Follow installation wizard
 3. Launch from Start Menu
 4. Settings auto-save to `%APPDATA%\WhisperCat\`
 
-### If you provide the portable package:
+### If you provide the portable EXE:
+1. Download `WhisperCat.exe`
+2. Double-click to run
+3. Right-click → "Pin to taskbar" (stays accessible!)
+4. Settings auto-save to `%APPDATA%\WhisperCat\`
+5. Requires Java 11+ installed
+
+### If you provide the portable ZIP package:
 1. Extract `WhisperCat-Portable.zip`
 2. Double-click `WhisperCat.bat`
 3. Settings auto-save to `%APPDATA%\WhisperCat\`
