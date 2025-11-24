@@ -6,7 +6,7 @@ package org.whispercat.sidemenu;
  */
 public class MenuAction {
 
-    protected boolean isCancel() {
+    public boolean isCancel() {
         return cancel;
     }
 
