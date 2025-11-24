@@ -33,7 +33,7 @@ public class ToastNotification extends JDialog {
 
     private void initComponents(String message) {
         setLayout(new BorderLayout());
-        setAlwaysOnTop(false);
+        setAlwaysOnTop(true);
         setBackground(new Color(0, 0, 0, 0));
 
         JPanel contentPanel = new JPanel() {
