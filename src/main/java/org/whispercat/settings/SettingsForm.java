@@ -32,9 +32,12 @@ public class SettingsForm extends JPanel {
     private final JComboBox<Integer> bitrateComboBox;
     private final ConfigManager configManager;
     private final JCheckBox stopSoundSwitch;
-    private final JProgressBar volumeBar;
+    private final ThresholdProgressBar volumeBar;
     private final JButton stopTestButton;
     private final JButton testMicrophoneButton;
+
+    // Track if settings have been modified
+    private boolean settingsDirty = false;
 
     // Silence removal settings
     private JCheckBox silenceRemovalSwitch;
@@ -79,9 +82,12 @@ public class SettingsForm extends JPanel {
     public SettingsForm(ConfigManager configManager) {
         this.configManager = configManager;
 
-        volumeBar = new JProgressBar(0, 100);
+        volumeBar = new ThresholdProgressBar(0, 100);
         volumeBar.setStringPainted(true);
         volumeBar.setVisible(false);
+        // Set initial threshold from config (threshold is 0.0-1.0, bar is 0-100)
+        float initialThreshold = configManager.getSilenceThreshold();
+        volumeBar.setThreshold((int)(initialThreshold * 100));
         stopTestButton = new JButton("Stop Test");
         stopTestButton.setVisible(false);
         stopTestButton.addActionListener(e -> stopAudioTest());
@@ -174,6 +180,11 @@ public class SettingsForm extends JPanel {
         gbc.anchor = GridBagConstraints.EAST;
         contentPanel.add(new JLabel("Microphone:"), gbc);
         microphoneComboBox = new JComboBox<>(getAvailableMicrophones());
+        microphoneComboBox.addItemListener(e -> {
+            if (e.getStateChange() == ItemEvent.SELECTED) {
+                settingsDirty = true;
+            }
+        });
         gbc.gridx = 1;
         gbc.gridy = row;
         gbc.gridwidth = 2;
@@ -222,6 +233,11 @@ public class SettingsForm extends JPanel {
         contentPanel.add(new JLabel("Bitrate:"), gbc);
         Integer[] bitrates = {16000, 18000, 20000, 22000, 24000, 26000, 28000, 30000, 32000};
         bitrateComboBox = new JComboBox<>(bitrates);
+        bitrateComboBox.addItemListener(e -> {
+            if (e.getStateChange() == ItemEvent.SELECTED) {
+                settingsDirty = true;
+            }
+        });
         gbc.gridx = 1;
         gbc.gridy = row;
         gbc.gridwidth = 2;
@@ -243,6 +259,7 @@ public class SettingsForm extends JPanel {
         gbc.gridwidth = 2;
         gbc.weightx = 1.0;
         gbc.anchor = GridBagConstraints.WEST;
+        stopSoundSwitch.addActionListener(e -> settingsDirty = true);
         contentPanel.add(stopSoundSwitch, gbc);
 
         row++;
@@ -256,6 +273,7 @@ public class SettingsForm extends JPanel {
         contentPanel.add(new JLabel("Auto-remove silence:"), gbc);
         silenceRemovalSwitch = new JCheckBox();
         silenceRemovalSwitch.setSelected(configManager.isSilenceRemovalEnabled());
+        silenceRemovalSwitch.addActionListener(e -> settingsDirty = true);
         gbc.gridx = 1;
         gbc.gridy = row;
         gbc.gridwidth = 2;
@@ -286,6 +304,10 @@ public class SettingsForm extends JPanel {
         silenceThresholdSlider.addChangeListener(e -> {
             float value = silenceThresholdSlider.getValue() / 1000.0f;
             thresholdValueLabel.setText(String.format("%.3f", value));
+            // Update threshold indicator on volume bar
+            volumeBar.setThreshold((int)(value * 100));
+            // Mark settings as dirty when user interacts
+            settingsDirty = true;
             // Auto-save when slider stops moving (not dragging)
             if (!silenceThresholdSlider.getValueIsAdjusting()) {
                 configManager.setSilenceThreshold(value);
@@ -1020,6 +1042,12 @@ public class SettingsForm extends JPanel {
     }
 
     private void saveSettings(ActionEvent e) {
+        // Only save if settings have been modified
+        if (!settingsDirty) {
+            logger.debug("Settings unchanged, skipping save");
+            return;
+        }
+
         // Save key combination and sequence
         String keyCombinationString = keyCombinationTextField.getKeysDisplayed().stream()
                 .map(String::valueOf)
@@ -1074,6 +1102,10 @@ public class SettingsForm extends JPanel {
         configManager.setKeepCompressedFile(keepCompressedSwitch.isSelected());
 
         configManager.saveConfig();
+
+        // Reset dirty flag after successful save
+        settingsDirty = false;
+
         Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
                 "Settings saved.");
         logger.info("Settings saved: Key shortcuts - {}, Key sequence - {}, Microphone - {}",
