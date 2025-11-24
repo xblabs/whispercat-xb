@@ -33,6 +33,8 @@ public class MainForm extends JLayeredPane {
     private ConfigManager configManager;
     public RecorderForm recorderForm;
     public SettingsForm settingsForm;
+    private int currentMenuIndex = 0;
+    private int currentSubIndex = 0;
     private static final org.apache.logging.log4j.Logger logger = org.apache.logging.log4j.LogManager.getLogger(MainForm.class);
 
     public MainForm() {
@@ -98,8 +100,10 @@ public class MainForm extends JLayeredPane {
             // Don't stop recording when switching screens - let user keep recording
             // Recording continues in background, only stopped by explicit user action
 
-            // Stop audio test and auto-save settings when leaving settings screen
-            if( index != 1 && settingsForm != null) {
+            // Stop audio test and auto-save settings ONLY when leaving settings screen
+            boolean leavingSettingsScreen = (currentMenuIndex == 1 && currentSubIndex == 1) &&
+                                           !(index == 1 && subIndex == 1);
+            if(leavingSettingsScreen && settingsForm != null) {
                 settingsForm.stopAudioTest();
                 settingsForm.saveSettings();  // Auto-save to prevent confusion
             }
@@ -145,6 +149,12 @@ public class MainForm extends JLayeredPane {
             else if (index == 9) {
             } else {
                 action.cancel();
+            }
+
+            // Update current menu tracking after successful navigation
+            if (!action.isCancel()) {
+                currentMenuIndex = index;
+                currentSubIndex = subIndex;
             }
         });
     }
