@@ -93,10 +93,6 @@ public class MainForm extends JLayeredPane {
 
     private void initMenuEvent() {
         menu.addMenuEvent((int index, int subIndex, MenuAction action) -> {
-            globalHotkeyListener.setOptionsDialogOpen(false, null, null);
-            globalHotkeyListener.updateKeyCombination(configManager.getKeyCombination());
-            globalHotkeyListener.updateKeySequence(configManager.getKeySequence());
-
             // Don't stop recording when switching screens - let user keep recording
             // Recording continues in background, only stopped by explicit user action
 
@@ -107,6 +103,11 @@ public class MainForm extends JLayeredPane {
                 settingsForm.stopAudioTest();
                 settingsForm.saveSettings();  // Auto-save to prevent confusion
             }
+
+            // Update hotkeys from config AFTER saving (so new settings take effect)
+            globalHotkeyListener.setOptionsDialogOpen(false, null, null);
+            globalHotkeyListener.updateKeyCombination(configManager.getKeyCombination());
+            globalHotkeyListener.updateKeySequence(configManager.getKeySequence());
 
             // Reuse RecorderForm instance to preserve state (transcription, logs, etc.)
             if (index == 0) {
