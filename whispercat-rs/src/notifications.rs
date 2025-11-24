@@ -1,5 +1,4 @@
 use chrono::{DateTime, Local};
-use std::time::Duration;
 
 /// Toast notification levels matching the logger
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

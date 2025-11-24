@@ -1,7 +1,6 @@
 use crate::config::Config;
-use crate::error::Result;
 use crate::pipeline::{Pipeline, Unit, Provider};
-use egui::{Context, RichText, Ui};
+use egui::{RichText, Ui};
 use uuid::Uuid;
 
 pub struct RecordingScreen {

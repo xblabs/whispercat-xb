@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::hotkey::HotkeyManager;
 use crate::logger::StructuredLogger;
 use crate::notifications::ToastManager;
-use crate::pipeline::{ExecutionResult, Pipeline, PipelineExecutor};
+use crate::pipeline::{ExecutionResult, PipelineExecutor};
 use crate::transcription::{ModelsClient, TranscriptionClient, TranscriptionProvider, TranscriptionRequest};
 use crate::tray::TrayManager;
 use crate::ui::{RecordingAction, RecordingScreen, SettingsAction, SettingsScreen, PipelinesAction, PipelinesScreen};

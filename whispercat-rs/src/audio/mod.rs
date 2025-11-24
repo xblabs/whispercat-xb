@@ -4,6 +4,6 @@ pub mod recorder;
 pub mod compressor;
 
 pub use buffer::AudioBuffer;
-pub use processor::{SilenceAnalysis, SilenceRemover};
-pub use recorder::{AudioRecorder, RecordingState};
-pub use compressor::{AudioCompressor, MAX_FILE_SIZE_MB};
+pub use processor::SilenceRemover;
+pub use recorder::AudioRecorder;
+pub use compressor::AudioCompressor;

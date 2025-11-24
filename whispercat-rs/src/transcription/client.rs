@@ -3,7 +3,7 @@ use crate::error::{Result, WhisperCatError};
 use crate::transcription::types::{
     TranscriptionProvider, TranscriptionRequest, TranscriptionResponse,
 };
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Unified transcription client that routes to different providers
 #[derive(Clone)]
