@@ -329,7 +329,7 @@ public class SettingsForm extends JPanel {
         gbc.gridwidth = 2;
         gbc.weightx = 1.0;
         gbc.anchor = GridBagConstraints.WEST;
-        JLabel thresholdHint = new JLabel("<html><i>Lower = more aggressive (removes more), Higher = conservative (removes less)</i></html>");
+        JLabel thresholdHint = new JLabel("<html><i>Lower = conservative (removes less), Higher = aggressive (removes more)</i></html>");
         thresholdHint.setFont(new Font("Dialog", Font.PLAIN, 10));
         thresholdHint.setForeground(Color.GRAY);
         contentPanel.add(thresholdHint, gbc);
