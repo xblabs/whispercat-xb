@@ -866,38 +866,23 @@ public class RecorderForm extends javax.swing.JPanel {
                 isRecording = false;
             }
 
-            // Only run post-processing if we have a valid transcript
+            // Run post-processing asynchronously if enabled
             if (transcript != null && !transcript.trim().isEmpty() &&
                 enablePostProcessingCheckBox.isSelected() && postProcessingSelectComboBox.getSelectedItem() != null) {
                     PostProcessingItem selectedItem = (PostProcessingItem) postProcessingSelectComboBox.getSelectedItem();
                     if (selectedItem != null && selectedItem.uuid != null) {
                         Pipeline pipeline = configManager.getPipelineByUuid(selectedItem.uuid);
                         if (pipeline != null) {
-                            PostProcessingService ppService = new PostProcessingService(configManager);
-                            String processedText = ppService.applyPipeline(transcript, pipeline);
-                            RecorderForm.this.processedText.setText(processedText);
-                            // Show pipeline completion toast
-                            Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
-                                    "Post-processing completed!");
-                            // Show system-level notification
-                            TrayIconManager trayManager = AudioRecorderUI.getTrayIconManager();
-                            if (trayManager != null) {
-                                trayManager.showSystemNotification("WhisperCat", "Post-processing completed");
-                            }
-                            playFinishSound();
-                            // Remove focus from text areas to prevent pasting into them
-                            transcriptionTextArea.transferFocus();
-                            RecorderForm.this.processedText.transferFocus();
-                            copyTranscriptionToClipboard(processedText);
-                            pasteFromClipboard();
-                            updateTrayMenu();
-                            // Remember the last used pipeline
-                            configManager.setLastUsedPipelineUUID(pipeline.uuid);
+                            // Run post-processing in separate worker to avoid blocking UI
+                            new PostProcessingWorker(transcript, pipeline).execute();
                         } else {
                             logger.error("Pipeline not found for UUID: " + selectedItem.uuid);
                             console.logError("Pipeline not found: " + selectedItem.uuid);
+                            resetUIAfterTranscription();
                             updateTrayMenu();
                         }
+                    } else {
+                        resetUIAfterTranscription();
                     }
             } else if (transcript != null && !transcript.trim().isEmpty()) {
                 // No post-processing, just copy raw transcript if auto-paste enabled
@@ -908,11 +893,66 @@ public class RecorderForm extends javax.swing.JPanel {
                     pasteFromClipboard();
                 }
                 playFinishSound();
+                resetUIAfterTranscription();
+                updateTrayMenu();
+            } else {
+                resetUIAfterTranscription();
+            }
+        }
+    }
+
+    /**
+     * Worker for running post-processing pipelines asynchronously
+     */
+    private class PostProcessingWorker extends SwingWorker<String, Void> {
+        private final String inputText;
+        private final Pipeline pipeline;
+
+        public PostProcessingWorker(String inputText, Pipeline pipeline) {
+            this.inputText = inputText;
+            this.pipeline = pipeline;
+        }
+
+        @Override
+        protected String doInBackground() {
+            PostProcessingService ppService = new PostProcessingService(configManager);
+            return ppService.applyPipeline(inputText, pipeline);
+        }
+
+        @Override
+        protected void done() {
+            try {
+                String processedText = get();
+                RecorderForm.this.processedText.setText(processedText);
+
+                // Show pipeline completion toast
+                Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
+                        "Post-processing completed!");
+
+                // Show system-level notification
+                TrayIconManager trayManager = AudioRecorderUI.getTrayIconManager();
+                if (trayManager != null) {
+                    trayManager.showSystemNotification("WhisperCat", "Post-processing completed");
+                }
+
+                playFinishSound();
+
+                // Remove focus from text areas to prevent pasting into them
+                transcriptionTextArea.transferFocus();
+                RecorderForm.this.processedText.transferFocus();
+
+                copyTranscriptionToClipboard(processedText);
+                pasteFromClipboard();
+
+                // Remember the last used pipeline
+                configManager.setLastUsedPipelineUUID(pipeline.uuid);
+            } catch (Exception e) {
+                logger.error("Error during post-processing", e);
+                ConsoleLogger.getInstance().logError("Post-processing failed: " + e.getMessage());
+            } finally {
+                resetUIAfterTranscription();
                 updateTrayMenu();
             }
-
-            // Reset UI after everything is done (keeps blue circle during post-processing)
-            resetUIAfterTranscription();
         }
     }
 }
