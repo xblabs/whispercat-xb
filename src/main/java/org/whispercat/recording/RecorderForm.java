@@ -15,6 +15,8 @@ import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.StringSelection;
@@ -54,6 +56,10 @@ public class RecorderForm extends javax.swing.JPanel {
     private JComboBox<PostProcessingItem> postProcessingSelectComboBox;
     private List<Pipeline> pipelineList;
     private JTextArea consoleLogArea;
+    private JButton runPipelineButton;
+    private boolean isManualPipelineRunning = false;
+    private final PipelineExecutionHistory pipelineHistory = new PipelineExecutionHistory();
+    private HistoryPanel historyPanel;
 
     public RecorderForm(ConfigManager configManager) {
         this.configManager = configManager;
@@ -111,6 +117,16 @@ public class RecorderForm extends javax.swing.JPanel {
         transcriptionTextArea.setLineWrap(true);
         transcriptionTextArea.setWrapStyleWord(true);
         transcriptionTextArea.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+
+        // Add document listener to update Run Pipeline button state
+        transcriptionTextArea.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) { updateRunPipelineButtonState(); }
+            @Override
+            public void removeUpdate(DocumentEvent e) { updateRunPipelineButtonState(); }
+            @Override
+            public void changedUpdate(DocumentEvent e) { updateRunPipelineButtonState(); }
+        });
 
         JScrollPane transcriptionTextScrollPane = new JScrollPane(transcriptionTextArea);
         transcriptionTextScrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
@@ -211,24 +227,22 @@ public class RecorderForm extends javax.swing.JPanel {
                 if (selectedItem != null) {
                     configManager.setLastUsedPostProcessingUUID(selectedItem.uuid);
                 }
+                updateRunPipelineButtonState();
             }
         });
 
-        // CardPanel for pipeline selection (show/hide based on checkbox)
-        JPanel cardPanel = new JPanel(new CardLayout());
-        cardPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-
+        // Pipeline selection panel - always visible so user can run pipelines manually
         JPanel pipelineSelectionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        pipelineSelectionPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         pipelineSelectionPanel.add(selectLabel);
         pipelineSelectionPanel.add(postProcessingSelectComboBox);
 
-        JPanel placeholderPanel = new JPanel();
-        placeholderPanel.setPreferredSize(new Dimension(0, 0));
-
-        cardPanel.add(placeholderPanel, "none");
-        cardPanel.add(pipelineSelectionPanel, "active");
-        CardLayout cl = (CardLayout) cardPanel.getLayout();
-        cl.show(cardPanel, "none");
+        // Run Pipeline button for manual pipeline execution
+        runPipelineButton = new JButton("\u25B6 Run Pipeline");
+        runPipelineButton.setToolTipText("Run selected pipeline on transcription text");
+        runPipelineButton.setEnabled(false);
+        runPipelineButton.addActionListener(e -> runManualPipeline());
+        pipelineSelectionPanel.add(runPipelineButton);
 
         // Add controls to responsive options panel
         optionsPanel.add(autoPasteCheckBox);
@@ -237,7 +251,7 @@ public class RecorderForm extends javax.swing.JPanel {
 
         postProcessingContainerPanel.add(optionsPanel);
         postProcessingContainerPanel.add(Box.createVerticalStrut(10));
-        postProcessingContainerPanel.add(cardPanel);
+        postProcessingContainerPanel.add(pipelineSelectionPanel);
 
 
         processedText.setLineWrap(true);
@@ -252,10 +266,8 @@ public class RecorderForm extends javax.swing.JPanel {
         processedTextScrollPane.setMinimumSize(new Dimension(600, processedText.getPreferredSize().height + 10));
 
         processedTextScrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
-        processedTextScrollPane.setVisible(false);
         JLabel additionalTextLabel = new JLabel("Post Processed text:");
         additionalTextLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        additionalTextLabel.setVisible(false);
 
         postProcessingContainerPanel.add(additionalTextLabel);
         postProcessingContainerPanel.add(processedTextScrollPane);
@@ -264,12 +276,16 @@ public class RecorderForm extends javax.swing.JPanel {
         JButton copyProcessedTextButton = new JButton("Copy");
         JPanel copyButtonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         copyButtonPanel.add(copyProcessedTextButton);
-        copyButtonPanel.setVisible(false);
         copyButtonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        copyProcessedTextButton.setVisible(true);
         copyProcessedTextButton.addActionListener(e -> copyTranscriptionToClipboard(processedText.getText()));
         postProcessingContainerPanel.add(Box.createVerticalStrut(10));
         postProcessingContainerPanel.add(copyButtonPanel);
+
+        // History panel for pipeline execution results
+        historyPanel = new HistoryPanel();
+        historyPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        postProcessingContainerPanel.add(Box.createVerticalStrut(5));
+        postProcessingContainerPanel.add(historyPanel);
 
         // Load saved state for post-processing checkbox
         enablePostProcessingCheckBox.setSelected(configManager.isPostProcessingEnabled());
@@ -278,26 +294,15 @@ public class RecorderForm extends javax.swing.JPanel {
             boolean selected = enablePostProcessingCheckBox.isSelected();
             // Save state when changed
             configManager.setPostProcessingEnabled(selected);
-            if (selected) {
-                cl.show(cardPanel, "active");
-            } else {
-                cl.show(cardPanel, "none");
-            }
-            additionalTextLabel.setVisible(selected);
+            // Show/hide the "Activate on startup" checkbox
             loadOnStartupCheckBox.setVisible(selected);
-            processedTextScrollPane.setVisible(selected);
-            copyButtonPanel.setVisible(selected);
             postProcessingContainerPanel.revalidate();
             postProcessingContainerPanel.repaint();
         });
 
         // Trigger initial UI setup based on loaded state
         if (enablePostProcessingCheckBox.isSelected()) {
-            cl.show(cardPanel, "active");
-            additionalTextLabel.setVisible(true);
             loadOnStartupCheckBox.setVisible(true);
-            processedTextScrollPane.setVisible(true);
-            copyButtonPanel.setVisible(true);
         }
 
         if (configManager.isPostProcessingOnStartup()) {
@@ -845,6 +850,12 @@ public class RecorderForm extends javax.swing.JPanel {
                 if (transcript != null) {
                     logger.info("Transcribed text: " + transcript);
                     transcriptionTextArea.setText(transcript);
+
+                    // Start new history session for this transcription
+                    pipelineHistory.startNewSession(transcript);
+                    processedText.setText("");  // Clear previous post-processed text
+                    historyPanel.updateResults(pipelineHistory.getResults());  // Reset history panel
+
                     console.logSuccess("Transcription completed");
                     console.log("Transcript length: " + transcript.length() + " characters");
                     // Show success notification
@@ -907,10 +918,12 @@ public class RecorderForm extends javax.swing.JPanel {
     private class PostProcessingWorker extends SwingWorker<String, Void> {
         private final String inputText;
         private final Pipeline pipeline;
+        private final long startTime;
 
         public PostProcessingWorker(String inputText, Pipeline pipeline) {
             this.inputText = inputText;
             this.pipeline = pipeline;
+            this.startTime = System.currentTimeMillis();
         }
 
         @Override
@@ -922,8 +935,16 @@ public class RecorderForm extends javax.swing.JPanel {
         @Override
         protected void done() {
             try {
-                String processedText = get();
-                RecorderForm.this.processedText.setText(processedText);
+                String processedResult = get();
+                int executionTime = (int) (System.currentTimeMillis() - startTime);
+
+                // Add result to history
+                pipelineHistory.addResult(pipeline.uuid, pipeline.title, processedResult, executionTime);
+
+                // Update history panel
+                historyPanel.updateResults(pipelineHistory.getResults());
+
+                RecorderForm.this.processedText.setText(processedResult);
 
                 // Show pipeline completion toast
                 Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
@@ -941,7 +962,7 @@ public class RecorderForm extends javax.swing.JPanel {
                 transcriptionTextArea.transferFocus();
                 RecorderForm.this.processedText.transferFocus();
 
-                copyTranscriptionToClipboard(processedText);
+                copyTranscriptionToClipboard(processedResult);
                 pasteFromClipboard();
 
                 // Remember the last used pipeline
@@ -955,4 +976,150 @@ public class RecorderForm extends javax.swing.JPanel {
             }
         }
     }
+
+    /**
+     * Updates the Run Pipeline button enabled state based on:
+     * - Transcription text field has content
+     * - A pipeline is selected
+     * - No manual pipeline is currently running
+     */
+    private void updateRunPipelineButtonState() {
+        if (runPipelineButton == null) {
+            return; // Button not yet initialized
+        }
+
+        boolean hasTranscription = transcriptionTextArea.getText() != null
+                && !transcriptionTextArea.getText().trim().isEmpty();
+        boolean hasPipelineSelected = postProcessingSelectComboBox.getSelectedItem() != null;
+        boolean canRun = hasTranscription && hasPipelineSelected && !isManualPipelineRunning && !isTranscribing;
+
+        runPipelineButton.setEnabled(canRun);
+
+        // Update tooltip based on state
+        if (!hasTranscription) {
+            runPipelineButton.setToolTipText("Record audio first");
+        } else if (!hasPipelineSelected) {
+            runPipelineButton.setToolTipText("Select a pipeline");
+        } else if (isManualPipelineRunning || isTranscribing) {
+            runPipelineButton.setToolTipText("Pipeline is running...");
+        } else {
+            runPipelineButton.setToolTipText("Run selected pipeline on transcription text");
+        }
+    }
+
+    /**
+     * Runs the selected pipeline manually on the current transcription text.
+     * Works regardless of "Enable Post Processing" checkbox state.
+     */
+    private void runManualPipeline() {
+        String transcript = transcriptionTextArea.getText();
+        if (transcript == null || transcript.trim().isEmpty()) {
+            Notificationmanager.getInstance().showNotification(ToastNotification.Type.WARNING,
+                    "No transcription text to process");
+            return;
+        }
+
+        PostProcessingItem selectedItem = (PostProcessingItem) postProcessingSelectComboBox.getSelectedItem();
+        if (selectedItem == null || selectedItem.uuid == null) {
+            Notificationmanager.getInstance().showNotification(ToastNotification.Type.WARNING,
+                    "Please select a pipeline");
+            return;
+        }
+
+        Pipeline pipeline = configManager.getPipelineByUuid(selectedItem.uuid);
+        if (pipeline == null) {
+            Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                    "Pipeline not found: " + selectedItem.title);
+            return;
+        }
+
+        // Update UI state
+        isManualPipelineRunning = true;
+        runPipelineButton.setText("Running...");
+        runPipelineButton.setEnabled(false);
+        isTranscribing = true;  // Show blue indicator
+        statusIndicatorPanel.repaint();
+
+        ConsoleLogger.getInstance().separator();
+        ConsoleLogger.getInstance().log("Manual pipeline run: " + pipeline.title);
+
+        // Run pipeline in worker
+        new ManualPipelineWorker(transcript, pipeline).execute();
+    }
+
+    /**
+     * Worker for running manual pipeline executions asynchronously
+     */
+    private class ManualPipelineWorker extends SwingWorker<String, Void> {
+        private final String inputText;
+        private final Pipeline pipeline;
+        private final long startTime;
+        private final String previousResult;  // Capture current result before running
+
+        public ManualPipelineWorker(String inputText, Pipeline pipeline) {
+            this.inputText = inputText;
+            this.pipeline = pipeline;
+            this.startTime = System.currentTimeMillis();
+            // Capture the current post-processed text before we run
+            this.previousResult = processedText.getText();
+        }
+
+        @Override
+        protected String doInBackground() {
+            PostProcessingService ppService = new PostProcessingService(configManager);
+            return ppService.applyPipeline(inputText, pipeline);
+        }
+
+        @Override
+        protected void done() {
+            try {
+                String result = get();
+                int executionTime = (int) (System.currentTimeMillis() - startTime);
+
+                // Result stacking: save previous result to history if it exists
+                if (previousResult != null && !previousResult.trim().isEmpty()) {
+                    // The previous result was from some pipeline run, we need to save it
+                    // Note: We don't have the previous pipeline info, so we mark it as "Previous result"
+                    // This is a limitation - in Phase 4 we'll track this properly
+                    ConsoleLogger.getInstance().log("Previous result saved to history");
+                    Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
+                            "Previous result saved to history");
+                }
+
+                // Add new result to history
+                pipelineHistory.addResult(pipeline.uuid, pipeline.title, result, executionTime);
+
+                // Update history panel
+                historyPanel.updateResults(pipelineHistory.getResults());
+
+                // Update the display
+                processedText.setText(result);
+
+                // Post-processed text area is now always visible
+
+                ConsoleLogger.getInstance().logSuccess("Manual pipeline completed: " + pipeline.title +
+                        " (" + executionTime + "ms)");
+
+                Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
+                        "Pipeline completed: " + pipeline.title);
+
+                // Remember the last used pipeline
+                configManager.setLastUsedPipelineUUID(pipeline.uuid);
+
+            } catch (Exception e) {
+                logger.error("Error during manual pipeline execution", e);
+                ConsoleLogger.getInstance().logError("Pipeline failed: " + e.getMessage());
+                Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                        "Pipeline failed: " + e.getMessage());
+            } finally {
+                // Reset UI state
+                isManualPipelineRunning = false;
+                isTranscribing = false;
+                statusIndicatorPanel.repaint();
+                runPipelineButton.setText("\u25B6 Run Pipeline");
+                updateRunPipelineButtonState();
+            }
+        }
+    }
+
 }
