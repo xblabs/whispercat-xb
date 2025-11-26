@@ -766,7 +766,33 @@ public class SettingsForm extends JPanel {
         CardLayout cl = (CardLayout) (whisperSettingsPanel.getLayout());
         cl.show(whisperSettingsPanel, (String) whisperServerComboBox.getSelectedItem());
 
-        // Settings are now auto-saved when leaving the screen - no Save button needed
+        // Add Apply Settings button at the bottom
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 15));
+        JButton applyButton = new JButton("Apply Settings");
+        applyButton.setToolTipText("Save all settings now");
+        applyButton.addActionListener(e -> {
+            boolean hadChanges = settingsDirty;
+            saveSettings(e);
+            if (!hadChanges) {
+                Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
+                        "No changes to apply");
+            }
+            // saveSettings already shows success toast if there were changes
+        });
+        buttonPanel.add(applyButton);
+
+        // Add note about auto-save
+        JLabel autoSaveNote = new JLabel("<html><i>Settings also auto-save when you leave this screen</i></html>");
+        autoSaveNote.setFont(new Font("Dialog", Font.PLAIN, 10));
+        autoSaveNote.setForeground(Color.GRAY);
+        buttonPanel.add(autoSaveNote);
+
+        gbc.gridx = 0;
+        gbc.gridy = row++;
+        gbc.gridwidth = 3;
+        gbc.anchor = GridBagConstraints.CENTER;
+        gbc.insets = new Insets(20, 5, 10, 5);
+        contentPanel.add(buttonPanel, gbc);
 
         loadSettings();
 
