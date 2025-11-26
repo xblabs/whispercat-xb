@@ -69,4 +69,10 @@ impl From<cpal::DefaultStreamConfigError> for WhisperCatError {
     }
 }
 
+impl From<cpal::SupportedStreamConfigsError> for WhisperCatError {
+    fn from(err: cpal::SupportedStreamConfigsError) -> Self {
+        WhisperCatError::AudioDeviceError(format!("Failed to get supported configs: {}", err))
+    }
+}
+
 pub type Result<T> = std::result::Result<T, WhisperCatError>;
