@@ -9,6 +9,14 @@ import org.whispercat.postprocessing.PostProcessingService;
 import org.whispercat.recording.clients.FasterWhisperTranscribeClient;
 import org.whispercat.recording.clients.OpenAITranscribeClient;
 import org.whispercat.recording.clients.OpenWebUITranscribeClient;
+import org.whispercat.recording.AudioFileAnalyzer;
+import org.whispercat.recording.AudioFileAnalyzer.AnalysisResult;
+import org.whispercat.recording.AudioFileAnalyzer.LargeFileOption;
+import org.whispercat.recording.WavChunker;
+import org.whispercat.recording.FfmpegChunker;
+import org.whispercat.recording.FfmpegCompressor;
+import org.whispercat.recording.LargeFileOptionsDialog;
+import org.whispercat.recording.ChunkedTranscriptionWorker;
 
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
@@ -413,6 +421,7 @@ public class RecorderForm extends javax.swing.JPanel {
 
     /**
      * Handles a dropped audio file by converting if necessary and transcribing.
+     * Includes pre-flight analysis for large files and chunking support.
      */
     private void handleDroppedAudioFile(File file) {
         logger.info("Dropped file: " + file.getName());
@@ -421,8 +430,80 @@ public class RecorderForm extends javax.swing.JPanel {
         // Set transcribing state (blue indicator)
         isTranscribing = true;
         statusIndicatorPanel.repaint();
-        recordButton.setText("Converting...");
+        recordButton.setText("Analyzing...");
         recordButton.setEnabled(false);
+
+        // Pre-flight analysis
+        AnalysisResult analysis = AudioFileAnalyzer.analyze(file);
+
+        // Check if file exceeds API limit and we're using OpenAI
+        if (analysis.exceedsApiLimit && "OpenAI".equals(configManager.getWhisperServer())) {
+            handleLargeFile(file, analysis);
+            return;
+        }
+
+        // Normal flow for files within limits
+        processAudioFile(file);
+    }
+
+    /**
+     * Handles a large audio file that exceeds the API limit.
+     * Shows options dialog or uses saved preference.
+     */
+    private void handleLargeFile(File file, AnalysisResult analysis) {
+        ConsoleLogger console = ConsoleLogger.getInstance();
+        console.log("File exceeds 25MB API limit - showing options...");
+
+        // Check for saved preference
+        String savedOption = configManager.getLargeFileDefaultOption();
+        LargeFileOption selectedOption = null;
+
+        if (!savedOption.isEmpty()) {
+            try {
+                selectedOption = LargeFileOption.valueOf(savedOption);
+                console.log("Using saved preference: " + selectedOption.getDescription());
+            } catch (IllegalArgumentException e) {
+                // Invalid saved option, will show dialog
+                configManager.clearLargeFileDefaultOption();
+            }
+        }
+
+        // Show dialog if no valid saved preference
+        if (selectedOption == null) {
+            LargeFileOptionsDialog dialog = new LargeFileOptionsDialog(
+                SwingUtilities.getWindowAncestor(this),
+                analysis,
+                configManager
+            );
+            selectedOption = dialog.showAndGetSelection();
+        }
+
+        // Handle the selected option
+        switch (selectedOption) {
+            case SPLIT_AND_TRANSCRIBE:
+                handleChunkedTranscription(file, analysis);
+                break;
+            case COMPRESS_FIRST:
+                handleCompressAndTranscribe(file);
+                break;
+            case USE_LOCAL_WHISPER:
+                handleLocalWhisperTranscription(file);
+                break;
+            case CANCEL:
+            default:
+                console.log("Large file handling cancelled");
+                resetUIAfterTranscription();
+                break;
+        }
+    }
+
+    /**
+     * Processes a normal audio file (within API limits).
+     */
+    private void processAudioFile(File file) {
+        ConsoleLogger console = ConsoleLogger.getInstance();
+
+        recordButton.setText("Converting...");
 
         File fileToTranscribe = file;
 
@@ -454,6 +535,261 @@ public class RecorderForm extends javax.swing.JPanel {
         Notificationmanager.getInstance().showNotification(ToastNotification.Type.INFO,
                 "Transcribing audio file...");
         new AudioTranscriptionWorker(fileToTranscribe).execute();
+    }
+
+    /**
+     * Handles chunked transcription for large files.
+     * Splits the file into chunks and transcribes each sequentially.
+     */
+    private void handleChunkedTranscription(File file, AnalysisResult analysis) {
+        ConsoleLogger console = ConsoleLogger.getInstance();
+
+        console.separator();
+        console.log("Starting chunked transcription for large file...");
+        recordButton.setText("Splitting file...");
+
+        // Run chunking in background to not block UI
+        new SwingWorker<java.util.List<File>, Void>() {
+            @Override
+            protected java.util.List<File> doInBackground() {
+                // Choose chunking method based on format
+                if (analysis.canSplitNatively && "wav".equals(analysis.format)) {
+                    console.log("Using native WAV chunking (no FFmpeg needed)");
+                    WavChunker.ChunkResult result = WavChunker.splitWavFileBySize(
+                        file, AudioFileAnalyzer.TARGET_CHUNK_SIZE);
+                    if (result.success) {
+                        return result.chunks;
+                    } else {
+                        console.logError("WAV chunking failed: " + result.errorMessage);
+                        return null;
+                    }
+                } else if (analysis.ffmpegAvailable) {
+                    console.log("Using FFmpeg chunking");
+                    FfmpegChunker.ChunkResult result = FfmpegChunker.splitBySize(
+                        file, AudioFileAnalyzer.TARGET_CHUNK_SIZE);
+                    if (result.success) {
+                        return result.chunks;
+                    } else {
+                        console.logError("FFmpeg chunking failed: " + result.errorMessage);
+                        return null;
+                    }
+                } else {
+                    console.logError("No chunking method available (FFmpeg not installed)");
+                    return null;
+                }
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    java.util.List<File> chunks = get();
+                    if (chunks == null || chunks.isEmpty()) {
+                        Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                            "Failed to split file. Check logs for details.");
+                        resetUIAfterTranscription();
+                        return;
+                    }
+
+                    // Start chunked transcription
+                    startChunkedTranscription(chunks);
+
+                } catch (Exception e) {
+                    logger.error("Error during file chunking", e);
+                    console.logError("Chunking failed: " + e.getMessage());
+                    resetUIAfterTranscription();
+                }
+            }
+        }.execute();
+    }
+
+    /**
+     * Starts transcription of chunked audio files.
+     */
+    private void startChunkedTranscription(java.util.List<File> chunks) {
+        ConsoleLogger console = ConsoleLogger.getInstance();
+
+        console.log("Starting transcription of " + chunks.size() + " chunks...");
+        recordButton.setText("Transcribing 1/" + chunks.size() + "...");
+
+        ChunkedTranscriptionWorker worker = new ChunkedTranscriptionWorker(
+            chunks, configManager, new ChunkedTranscriptionWorker.Callback() {
+                @Override
+                public void onProgress(ChunkedTranscriptionWorker.Progress progress) {
+                    recordButton.setText(String.format("Transcribing %d/%d...",
+                        progress.currentChunk + 1, progress.totalChunks));
+                }
+
+                @Override
+                public void onComplete(String fullTranscript) {
+                    transcriptionTextArea.setText(fullTranscript);
+
+                    // Start new history session for this transcription
+                    pipelineHistory.startNewSession(fullTranscript);
+                    processedText.setText("");
+                    historyPanel.updateResults(pipelineHistory.getResults());
+
+                    console.logSuccess("Chunked transcription completed");
+                    Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
+                        "Transcription completed!");
+
+                    // Handle post-processing if enabled
+                    handlePostTranscriptionActions(fullTranscript);
+
+                    resetUIAfterTranscription();
+                    updateTrayMenu();
+                }
+
+                @Override
+                public void onError(String errorMessage) {
+                    console.logError("Chunked transcription failed: " + errorMessage);
+                    Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                        "Transcription failed. See logs for details.");
+                    resetUIAfterTranscription();
+                }
+
+                @Override
+                public void onCancelled() {
+                    console.log("Chunked transcription cancelled");
+                    resetUIAfterTranscription();
+                }
+            }
+        );
+
+        worker.execute();
+    }
+
+    /**
+     * Handles compression and transcription for large files.
+     * Compresses the file first, then transcribes if within limits.
+     */
+    private void handleCompressAndTranscribe(File file) {
+        ConsoleLogger console = ConsoleLogger.getInstance();
+
+        console.separator();
+        console.log("Compressing file before transcription...");
+        recordButton.setText("Compressing...");
+
+        new SwingWorker<FfmpegCompressor.CompressionResult, Void>() {
+            @Override
+            protected FfmpegCompressor.CompressionResult doInBackground() {
+                return FfmpegCompressor.compress(file);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    FfmpegCompressor.CompressionResult result = get();
+                    if (!result.success) {
+                        console.logError("Compression failed: " + result.errorMessage);
+                        Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                            "Compression failed: " + result.errorMessage);
+                        resetUIAfterTranscription();
+                        return;
+                    }
+
+                    if (!result.withinLimit) {
+                        // Still too large - need to split
+                        console.log("Compressed file still exceeds limit - switching to chunking");
+                        AnalysisResult newAnalysis = AudioFileAnalyzer.analyze(result.compressedFile);
+                        handleChunkedTranscription(result.compressedFile, newAnalysis);
+                    } else {
+                        // Compressed file is within limits - proceed with normal transcription
+                        console.logSuccess("Compression successful - proceeding with transcription");
+                        processAudioFile(result.compressedFile);
+                    }
+
+                } catch (Exception e) {
+                    logger.error("Error during compression", e);
+                    console.logError("Compression failed: " + e.getMessage());
+                    resetUIAfterTranscription();
+                }
+            }
+        }.execute();
+    }
+
+    /**
+     * Handles transcription using local Whisper (Faster-Whisper).
+     * Temporarily switches the server setting and transcribes.
+     */
+    private void handleLocalWhisperTranscription(File file) {
+        ConsoleLogger console = ConsoleLogger.getInstance();
+
+        console.separator();
+        console.log("Using Faster-Whisper for large file (no size limit)");
+
+        // Note: We don't change the global setting, just use the local client directly
+        recordButton.setText("Transcribing (local)...");
+
+        new SwingWorker<String, Void>() {
+            @Override
+            protected String doInBackground() {
+                try {
+                    return fasterWhisperTranscribeClient.transcribe(file);
+                } catch (Exception e) {
+                    logger.error("Faster-Whisper transcription failed", e);
+                    return null;
+                }
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    String transcript = get();
+                    if (transcript != null && !transcript.isEmpty()) {
+                        transcriptionTextArea.setText(transcript);
+
+                        // Start new history session
+                        pipelineHistory.startNewSession(transcript);
+                        processedText.setText("");
+                        historyPanel.updateResults(pipelineHistory.getResults());
+
+                        console.logSuccess("Transcription completed");
+                        Notificationmanager.getInstance().showNotification(ToastNotification.Type.SUCCESS,
+                            "Transcription completed!");
+
+                        handlePostTranscriptionActions(transcript);
+                    } else {
+                        console.logError("Faster-Whisper returned empty transcript");
+                        Notificationmanager.getInstance().showNotification(ToastNotification.Type.ERROR,
+                            "Transcription failed or returned empty result");
+                    }
+                } catch (Exception e) {
+                    logger.error("Error getting transcription result", e);
+                    console.logError("Transcription failed: " + e.getMessage());
+                }
+                resetUIAfterTranscription();
+                updateTrayMenu();
+            }
+        }.execute();
+    }
+
+    /**
+     * Handles post-transcription actions like auto post-processing and clipboard copy.
+     */
+    private void handlePostTranscriptionActions(String transcript) {
+        if (transcript == null || transcript.trim().isEmpty()) {
+            return;
+        }
+
+        // Run post-processing if enabled
+        if (enablePostProcessingCheckBox.isSelected() && postProcessingSelectComboBox.getSelectedItem() != null) {
+            PostProcessingItem selectedItem = (PostProcessingItem) postProcessingSelectComboBox.getSelectedItem();
+            if (selectedItem != null && selectedItem.uuid != null) {
+                Pipeline pipeline = configManager.getPipelineByUuid(selectedItem.uuid);
+                if (pipeline != null) {
+                    new PostProcessingWorker(transcript, pipeline).execute();
+                    return;  // PostProcessingWorker will handle clipboard
+                }
+            }
+        }
+
+        // No post-processing - handle clipboard directly
+        if (configManager.isAutoPasteEnabled()) {
+            transcriptionTextArea.transferFocus();
+            copyTranscriptionToClipboard(transcript);
+            pasteFromClipboard();
+        }
+        playFinishSound();
     }
 
     /**

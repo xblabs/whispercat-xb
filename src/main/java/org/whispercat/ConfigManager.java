@@ -756,4 +756,55 @@ public class ConfigManager {
 
         logger.info("Post-processing data migration completed successfully");
     }
+
+    // ========== Large Audio File Handling Settings ==========
+
+    /**
+     * Gets the default option for handling large audio files.
+     * Returns the option name as a string (e.g., "SPLIT_AND_TRANSCRIBE").
+     *
+     * @return The saved option name, or empty string if not set
+     */
+    public String getLargeFileDefaultOption() {
+        return properties.getProperty("largeFileDefaultOption", "");
+    }
+
+    /**
+     * Sets the default option for handling large audio files.
+     * Pass the enum name (e.g., "SPLIT_AND_TRANSCRIBE").
+     *
+     * @param option The option name to save
+     */
+    public void setLargeFileDefaultOption(String option) {
+        properties.setProperty("largeFileDefaultOption", option);
+        saveConfig();
+    }
+
+    /**
+     * Clears the saved large file handling preference.
+     */
+    public void clearLargeFileDefaultOption() {
+        properties.remove("largeFileDefaultOption");
+        saveConfig();
+    }
+
+    /**
+     * Checks if chunked transcription should show a progress dialog.
+     * Default is true.
+     *
+     * @return true if progress dialog should be shown
+     */
+    public boolean isChunkedTranscriptionProgressEnabled() {
+        return Boolean.parseBoolean(properties.getProperty("chunkedTranscriptionProgress", "true"));
+    }
+
+    /**
+     * Sets whether chunked transcription should show a progress dialog.
+     *
+     * @param enabled true to show progress dialog
+     */
+    public void setChunkedTranscriptionProgressEnabled(boolean enabled) {
+        properties.setProperty("chunkedTranscriptionProgress", String.valueOf(enabled));
+        saveConfig();
+    }
 }
