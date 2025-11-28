@@ -42,6 +42,11 @@ arboard = "3.3"
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
 global-hotkey = "0.5"
 
+# Note: Keyboard recording requires platform-specific libraries
+# On Linux: sudo apt-get install libxi-dev libxtst-dev
+# Uncomment to enable keyboard recording:
+# rdev = "0.5"
+
 # Windows-specific dependencies
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "wingdi", "winnt", "windef", "shellapi"] }
