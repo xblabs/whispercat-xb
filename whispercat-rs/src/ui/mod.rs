@@ -249,7 +249,8 @@ impl SettingsScreen {
                         let response = ui.add(
                             egui::TextEdit::singleline(&mut self.api_key_input)
                                 .password(true)
-                                .hint_text("sk-..."),
+                                .hint_text("sk-...")
+                                .desired_width(ui.available_width()),
                         );
                         if response.changed() {
                             action = SettingsAction::SaveConfig;
@@ -262,6 +263,7 @@ impl SettingsScreen {
                             if self.show_model_dropdown && !self.available_models.is_empty() {
                                 egui::ComboBox::from_id_source("model_selector_openai")
                                     .selected_text(&self.model_input)
+                                    .width(ui.available_width() - 150.0)
                                     .show_ui(ui, |ui| {
                                         for model in &self.available_models {
                                             if ui.selectable_value(&mut self.model_input, model.clone(), model).clicked() {
@@ -272,7 +274,8 @@ impl SettingsScreen {
                             } else {
                                 let response = ui.add(
                                     egui::TextEdit::singleline(&mut self.model_input)
-                                        .hint_text("whisper-1"),
+                                        .hint_text("whisper-1")
+                                        .desired_width(ui.available_width() - 150.0), // Reserve space for button
                                 );
                                 if response.changed() {
                                     action = SettingsAction::SaveConfig;
@@ -300,7 +303,8 @@ impl SettingsScreen {
                         ui.label("Server URL:");
                         let response = ui.add(
                             egui::TextEdit::singleline(&mut self.faster_whisper_url)
-                                .hint_text("http://localhost:8000"),
+                                .hint_text("http://localhost:8000")
+                                .desired_width(ui.available_width()),
                         );
                         if response.changed() {
                             action = SettingsAction::SaveConfig;
@@ -313,6 +317,7 @@ impl SettingsScreen {
                             if self.show_model_dropdown && !self.available_models.is_empty() {
                                 egui::ComboBox::from_id_source("model_selector_faster_whisper")
                                     .selected_text(&self.model_input)
+                                    .width(ui.available_width() - 150.0)
                                     .show_ui(ui, |ui| {
                                         for model in &self.available_models {
                                             if ui.selectable_value(&mut self.model_input, model.clone(), model).clicked() {
@@ -323,7 +328,8 @@ impl SettingsScreen {
                             } else {
                                 let response = ui.add(
                                     egui::TextEdit::singleline(&mut self.model_input)
-                                        .hint_text("Systran/faster-whisper-large-v3"),
+                                        .hint_text("Systran/faster-whisper-large-v3")
+                                        .desired_width(ui.available_width() - 150.0),
                                 );
                                 if response.changed() {
                                     action = SettingsAction::SaveConfig;
@@ -351,7 +357,8 @@ impl SettingsScreen {
                         ui.label("Server URL:");
                         let response = ui.add(
                             egui::TextEdit::singleline(&mut self.openwebui_url)
-                                .hint_text("https://localhost:8080"),
+                                .hint_text("https://localhost:8080")
+                                .desired_width(ui.available_width()),
                         );
                         if response.changed() {
                             action = SettingsAction::SaveConfig;
@@ -363,7 +370,8 @@ impl SettingsScreen {
                         let response = ui.add(
                             egui::TextEdit::singleline(&mut self.openwebui_api_key)
                                 .password(true)
-                                .hint_text("owui-..."),
+                                .hint_text("owui-...")
+                                .desired_width(ui.available_width()),
                         );
                         if response.changed() {
                             action = SettingsAction::SaveConfig;
@@ -376,6 +384,7 @@ impl SettingsScreen {
                             if self.show_model_dropdown && !self.available_models.is_empty() {
                                 egui::ComboBox::from_id_source("model_selector_openwebui")
                                     .selected_text(&self.model_input)
+                                    .width(ui.available_width() - 150.0)
                                     .show_ui(ui, |ui| {
                                         for model in &self.available_models {
                                             if ui.selectable_value(&mut self.model_input, model.clone(), model).clicked() {
@@ -386,7 +395,8 @@ impl SettingsScreen {
                             } else {
                                 let response = ui.add(
                                     egui::TextEdit::singleline(&mut self.model_input)
-                                        .hint_text("whisper-1"),
+                                        .hint_text("whisper-1")
+                                        .desired_width(ui.available_width() - 150.0),
                                 );
                                 if response.changed() {
                                     action = SettingsAction::SaveConfig;
@@ -490,6 +500,7 @@ impl SettingsScreen {
                     let text_response = ui.add(
                         egui::TextEdit::singleline(&mut self.hotkey_input)
                             .hint_text("Ctrl+Shift+R")
+                            .desired_width(ui.available_width() - 120.0)  // Reserve space for button
                             .text_color(if self.recording_hotkey {
                                 egui::Color32::YELLOW
                             } else {
@@ -810,13 +821,20 @@ impl PipelinesScreen {
                     ui.add_space(5.0);
 
                     ui.label("Name:");
-                    ui.text_edit_singleline(&mut pipeline.name);
+                    ui.add(
+                        egui::TextEdit::singleline(&mut pipeline.name)
+                            .desired_width(ui.available_width())
+                    );
 
                     ui.add_space(5.0);
 
                     ui.label("Description (optional):");
                     let mut desc = pipeline.description.clone().unwrap_or_default();
-                    ui.text_edit_multiline(&mut desc);
+                    ui.add(
+                        egui::TextEdit::multiline(&mut desc)
+                            .desired_width(ui.available_width())
+                            .desired_rows(3)
+                    );
                     pipeline.description = if desc.is_empty() { None } else { Some(desc) };
 
                     ui.add_space(5.0);

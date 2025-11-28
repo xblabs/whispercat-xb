@@ -219,12 +219,19 @@ impl UnitLibraryScreen {
                 ui.add_space(5.0);
 
                 ui.label("Name:");
-                ui.text_edit_singleline(&mut self.unit_name);
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.unit_name)
+                        .desired_width(ui.available_width())
+                );
 
                 ui.add_space(5.0);
 
                 ui.label("Description (optional):");
-                ui.text_edit_multiline(&mut self.unit_description);
+                ui.add(
+                    egui::TextEdit::multiline(&mut self.unit_description)
+                        .desired_width(ui.available_width())
+                        .desired_rows(3)
+                );
             });
         });
 
@@ -259,17 +266,28 @@ impl UnitLibraryScreen {
                     ui.add_space(5.0);
 
                     ui.label("Model:");
-                    ui.text_edit_singleline(&mut self.model);
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.model)
+                            .desired_width(ui.available_width())
+                    );
 
                     ui.add_space(5.0);
 
                     ui.label("System Prompt:");
-                    ui.text_edit_multiline(&mut self.system_prompt);
+                    ui.add(
+                        egui::TextEdit::multiline(&mut self.system_prompt)
+                            .desired_width(ui.available_width())
+                            .desired_rows(4)
+                    );
 
                     ui.add_space(5.0);
 
                     ui.label("User Prompt Template (use {{input}} for the input text):");
-                    ui.text_edit_multiline(&mut self.user_prompt);
+                    ui.add(
+                        egui::TextEdit::multiline(&mut self.user_prompt)
+                            .desired_width(ui.available_width())
+                            .desired_rows(3)
+                    );
 
                 } else {
                     // Text replacement fields
@@ -277,12 +295,18 @@ impl UnitLibraryScreen {
                     ui.add_space(5.0);
 
                     ui.label("Find:");
-                    ui.text_edit_singleline(&mut self.find_text);
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.find_text)
+                            .desired_width(ui.available_width())
+                    );
 
                     ui.add_space(5.0);
 
                     ui.label("Replace:");
-                    ui.text_edit_singleline(&mut self.replace_text);
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.replace_text)
+                            .desired_width(ui.available_width())
+                    );
 
                     ui.add_space(5.0);
 
