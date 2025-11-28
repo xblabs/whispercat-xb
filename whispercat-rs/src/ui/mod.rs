@@ -1,7 +1,8 @@
 use crate::config::Config;
-use crate::pipeline::{Pipeline, Unit, Provider};
+use crate::pipeline::{Pipeline, ProcessingUnit, PipelineUnitReference, Unit, UnitType, Provider};
 use egui::{RichText, Ui};
 use uuid::Uuid;
+use chrono::Utc;
 
 pub struct RecordingScreen {
     pub is_recording: bool,
@@ -666,23 +667,28 @@ pub enum SettingsAction {
 
 pub struct PipelinesScreen {
     pub pipelines: Vec<Pipeline>,
+    pub processing_units: Vec<ProcessingUnit>,
     pub selected_pipeline: Option<Uuid>,
     pub editing_pipeline: Option<Pipeline>,
     pub show_editor: bool,
+    pub selected_unit_for_add: Option<Uuid>,
 }
 
 impl PipelinesScreen {
     pub fn from_config(config: &Config) -> Self {
         Self {
             pipelines: config.get_pipelines().to_vec(),
+            processing_units: config.get_processing_units().to_vec(),
             selected_pipeline: config.get_last_used_pipeline(),
             editing_pipeline: None,
             show_editor: false,
+            selected_unit_for_add: None,
         }
     }
 
     pub fn refresh_from_config(&mut self, config: &Config) {
         self.pipelines = config.get_pipelines().to_vec();
+        self.processing_units = config.get_processing_units().to_vec();
         self.selected_pipeline = config.get_last_used_pipeline();
     }
 
@@ -733,8 +739,13 @@ impl PipelinesScreen {
                             ui.heading(&pipeline.name);
                             ui.add_space(10.0);
 
-                            // Show unit count
-                            ui.label(format!("({} units)", pipeline.units.len()));
+                            // Show unit count (prefer unit_refs over legacy units)
+                            let unit_count = if !pipeline.unit_refs.is_empty() {
+                                pipeline.unit_refs.len()
+                            } else {
+                                pipeline.units.len()
+                            };
+                            ui.label(format!("({} units)", unit_count));
                         });
 
                         if let Some(desc) = &pipeline.description {
@@ -771,6 +782,8 @@ impl PipelinesScreen {
         let mut action = PipelinesAction::None;
         let mut should_close = false;
         let mut should_save = false;
+        let mut unit_to_remove: Option<usize> = None;
+        let mut unit_to_toggle: Option<usize> = None;
 
         if let Some(ref mut pipeline) = self.editing_pipeline {
             ui.heading("✏ Pipeline Editor");
@@ -805,72 +818,113 @@ impl PipelinesScreen {
                     let mut desc = pipeline.description.clone().unwrap_or_default();
                     ui.text_edit_multiline(&mut desc);
                     pipeline.description = if desc.is_empty() { None } else { Some(desc) };
+
+                    ui.add_space(5.0);
+
+                    ui.checkbox(&mut pipeline.enabled, "Pipeline Enabled");
                 });
             });
 
             ui.add_space(10.0);
 
-            // Units list
+            // Unit references list
             ui.group(|ui| {
                 ui.vertical(|ui| {
+                    ui.label(RichText::new("Processing Units").strong());
+                    ui.add_space(5.0);
+
+                    // Add unit from library
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Processing Units").strong());
-                        ui.add_space(10.0);
+                        ui.label("Add from library:");
 
-                        if ui.button("➕ Add Prompt Unit").clicked() {
-                            pipeline.add_unit(Unit::Prompt {
-                                id: Uuid::new_v4(),
-                                name: "New Prompt".to_string(),
-                                provider: Provider::OpenAI,
-                                model: "gpt-4".to_string(),
-                                system_prompt: String::new(),
-                                user_prompt_template: "{{input}}".to_string(),
-                            });
-                        }
+                        if self.processing_units.is_empty() {
+                            ui.label("(No units in library - create some in Unit Library first)");
+                        } else {
+                            egui::ComboBox::from_id_source("unit_selector")
+                                .selected_text("Select a unit...")
+                                .show_ui(ui, |ui| {
+                                    for unit in &self.processing_units {
+                                        let is_selected = self.selected_unit_for_add == Some(unit.id);
+                                        if ui.selectable_label(is_selected, &unit.name).clicked() {
+                                            self.selected_unit_for_add = Some(unit.id);
+                                        }
+                                    }
+                                });
 
-                        if ui.button("➕ Add Text Replacement").clicked() {
-                            pipeline.add_unit(Unit::TextReplacement {
-                                id: Uuid::new_v4(),
-                                name: "New Replacement".to_string(),
-                                find: String::new(),
-                                replace: String::new(),
-                                regex: false,
-                                case_sensitive: true,
-                            });
+                            if let Some(selected_id) = self.selected_unit_for_add {
+                                if ui.button("➕ Add").clicked() {
+                                    pipeline.add_unit_ref(selected_id);
+                                    self.selected_unit_for_add = None;
+                                }
+                            }
                         }
                     });
 
                     ui.add_space(10.0);
 
-                    if pipeline.units.is_empty() {
-                        ui.label("No units yet. Add a prompt or text replacement unit.");
+                    if pipeline.unit_refs.is_empty() {
+                        ui.label("No units in this pipeline yet. Add units from the library above.");
                     } else {
-                        // Render each unit
-                        for (idx, unit) in pipeline.units.iter().enumerate() {
+                        // Render each unit reference
+                        for (idx, unit_ref) in pipeline.unit_refs.iter().enumerate() {
                             ui.separator();
                             ui.add_space(5.0);
 
+                            // Find the unit in the library
+                            let unit = self.processing_units.iter().find(|u| u.id == unit_ref.unit_id);
+
                             ui.horizontal(|ui| {
-                                ui.label(format!("{}. {}", idx + 1, unit.name()));
+                                // Enable/disable checkbox
+                                let mut enabled = unit_ref.enabled;
+                                if ui.checkbox(&mut enabled, "").changed() {
+                                    unit_to_toggle = Some(idx);
+                                }
+
+                                // Unit name and number
+                                if let Some(unit) = unit {
+                                    ui.label(format!("{}. {}", idx + 1, unit.name));
+
+                                    // Show unit type
+                                    let (type_text, type_color) = match &unit.unit_type {
+                                        UnitType::Prompt { provider, .. } => {
+                                            (format!("({:?})", provider), egui::Color32::from_rgb(100, 150, 255))
+                                        }
+                                        UnitType::TextReplacement { .. } => {
+                                            ("(Text Replace)".to_string(), egui::Color32::from_rgb(150, 255, 100))
+                                        }
+                                    };
+                                    ui.colored_label(type_color, type_text);
+                                } else {
+                                    ui.colored_label(
+                                        egui::Color32::from_rgb(255, 100, 100),
+                                        format!("{}. [Unit not found: {}]", idx + 1, unit_ref.unit_id)
+                                    );
+                                }
 
                                 if ui.button("🗑").clicked() {
-                                    action = PipelinesAction::RemoveUnit(idx);
+                                    unit_to_remove = Some(idx);
                                 }
                             });
-
-                            // Show unit type
-                            match unit {
-                                Unit::Prompt { provider, model, .. } => {
-                                    ui.label(format!("Type: Prompt ({:?} / {})", provider, model));
-                                }
-                                Unit::TextReplacement { find, replace, .. } => {
-                                    ui.label(format!("Type: Replace '{}' → '{}'", find, replace));
-                                }
-                            }
                         }
                     }
                 });
             });
+        }
+
+        // Handle unit removal
+        if let Some(idx) = unit_to_remove {
+            if let Some(ref mut pipeline) = self.editing_pipeline {
+                pipeline.unit_refs.remove(idx);
+            }
+        }
+
+        // Handle unit toggle
+        if let Some(idx) = unit_to_toggle {
+            if let Some(ref mut pipeline) = self.editing_pipeline {
+                if let Some(unit_ref) = pipeline.unit_refs.get_mut(idx) {
+                    unit_ref.enabled = !unit_ref.enabled;
+                }
+            }
         }
 
         // Handle actions after borrowing ends
@@ -896,3 +950,7 @@ pub enum PipelinesAction {
     Execute(Uuid),
     RemoveUnit(usize),
 }
+
+// Unit Library module
+mod unit_library;
+pub use unit_library::{UnitLibraryScreen, UnitLibraryAction};

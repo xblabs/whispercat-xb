@@ -7,7 +7,7 @@ use crate::notifications::ToastManager;
 use crate::pipeline::{ExecutionResult, PipelineExecutor};
 use crate::transcription::{ModelsClient, TranscriptionClient, TranscriptionProvider, TranscriptionRequest};
 use crate::tray::TrayManager;
-use crate::ui::{RecordingAction, RecordingScreen, SettingsAction, SettingsScreen, PipelinesAction, PipelinesScreen};
+use crate::ui::{RecordingAction, RecordingScreen, SettingsAction, SettingsScreen, PipelinesAction, PipelinesScreen, UnitLibraryAction, UnitLibraryScreen};
 use std::path::PathBuf;
 use std::sync::mpsc;
 
@@ -23,6 +23,7 @@ pub struct App {
     recording_screen: RecordingScreen,
     settings_screen: SettingsScreen,
     pipelines_screen: PipelinesScreen,
+    unit_library_screen: UnitLibraryScreen,
 
     // Configuration
     config: Config,
@@ -58,6 +59,7 @@ pub enum Screen {
     Recording,
     Settings,
     Pipelines,
+    UnitLibrary,
 }
 
 pub enum AppMessage {
@@ -132,6 +134,7 @@ impl App {
             recording_screen,
             settings_screen,
             pipelines_screen: PipelinesScreen::from_config(&config),
+            unit_library_screen: UnitLibraryScreen::from_config(&config),
             config,
             message_rx: rx,
             message_tx: tx,
@@ -551,6 +554,7 @@ impl eframe::App for App {
                 ui.horizontal(|ui| {
                     ui.selectable_value(&mut self.current_screen, Screen::Recording, "🎤 Recording");
                     ui.selectable_value(&mut self.current_screen, Screen::Pipelines, "📋 Pipelines");
+                    ui.selectable_value(&mut self.current_screen, Screen::UnitLibrary, "📚 Unit Library");
                     ui.selectable_value(&mut self.current_screen, Screen::Settings, "⚙️ Settings");
                 });
             });
@@ -577,6 +581,7 @@ impl eframe::App for App {
                                             if let Some(ref executor) = self.pipeline_executor {
                                                 let executor_clone = executor.clone();
                                                 let pipeline_clone = pipeline.clone();
+                                                let processing_units = self.config.get_processing_units().to_vec();
                                                 let tx = self.message_tx.clone();
 
                                                 // Save the last used pipeline
@@ -589,7 +594,7 @@ impl eframe::App for App {
                                                 self.add_log(format!("Executing pipeline: {}", pipeline.name));
 
                                                 tokio::spawn(async move {
-                                                    match executor_clone.execute(text, &pipeline_clone).await {
+                                                    match executor_clone.execute_with_units(text, &pipeline_clone, &processing_units).await {
                                                         Ok(result) => {
                                                             tx.send(AppMessage::PipelineComplete { result }).ok();
                                                         }
@@ -645,13 +650,14 @@ impl eframe::App for App {
                                         if let Some(ref executor) = self.pipeline_executor {
                                             let executor_clone = executor.clone();
                                             let pipeline_clone = pipeline.clone();
+                                            let processing_units = self.config.get_processing_units().to_vec();
                                             let text_clone = text.clone();
                                             let tx = self.message_tx.clone();
 
                                             self.add_log(format!("Executing pipeline: {}", pipeline.name));
 
                                             tokio::spawn(async move {
-                                                match executor_clone.execute(text_clone, &pipeline_clone).await {
+                                                match executor_clone.execute_with_units(text_clone, &pipeline_clone, &processing_units).await {
                                                     Ok(result) => {
                                                         tx.send(AppMessage::PipelineComplete { result }).ok();
                                                     }
@@ -672,12 +678,8 @@ impl eframe::App for App {
                                     self.add_log("Pipeline not found".to_string());
                                 }
                             }
-                            PipelinesAction::RemoveUnit(idx) => {
-                                if let Some(ref mut pipeline) = self.pipelines_screen.editing_pipeline {
-                                    if idx < pipeline.units.len() {
-                                        pipeline.units.remove(idx);
-                                    }
-                                }
+                            PipelinesAction::RemoveUnit(_idx) => {
+                                // Legacy action - now handled directly in the editor
                             }
                             PipelinesAction::None => {}
                         }
@@ -701,6 +703,26 @@ impl eframe::App for App {
                                 }
                             }
                             SettingsAction::None => {}
+                        }
+                    }
+                    Screen::UnitLibrary => {
+                        let action = self.unit_library_screen.ui(ui);
+                        match action {
+                            UnitLibraryAction::SaveUnit(unit) => {
+                                self.config.save_processing_unit(unit);
+                                self.save_config();
+                                self.unit_library_screen.refresh_from_config(&self.config);
+                                self.pipelines_screen.refresh_from_config(&self.config);
+                                self.add_log("Processing unit saved".to_string());
+                            }
+                            UnitLibraryAction::DeleteUnit(id) => {
+                                self.config.delete_processing_unit(id);
+                                self.save_config();
+                                self.unit_library_screen.refresh_from_config(&self.config);
+                                self.pipelines_screen.refresh_from_config(&self.config);
+                                self.add_log("Processing unit deleted".to_string());
+                            }
+                            UnitLibraryAction::None => {}
                         }
                     }
                 }
